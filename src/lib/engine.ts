@@ -53,23 +53,12 @@ export class ChessEngine {
 		this.sendMessage(`go movetime ${ms}`);
 	}
 
-	/**
-	 * FIX: Resolves on "bestmove", returning the LAST score cp seen.
-	 *
-	 * Stockfish emits many "info depth N score cp X" lines during search.
-	 * Resolving on the first one gives depth-1 noise.
-	 * We accumulate lastScore and only resolve when "bestmove" arrives,
-	 * guaranteeing we get the full depth-8 evaluation.
-	 *
-	 * The returned value is in centipawns from the SIDE TO MOVE's perspective
-	 * (Stockfish standard). Callers must flip sign when it's Black to move
-	 * to obtain White-perspective centipawns.
-	 */
 	public evaluatePositionAsync(fen: string, depth: number = 8): Promise<number> {
 		return new Promise((resolve) => {
 			if (!this.worker) return resolve(0);
 
 			let lastScore = 0;
+			const turn = fen.split(' ')[1]; // 'w' or 'b'
 
 			this.sendMessage(`position fen ${fen}`);
 			this.sendMessage(`go depth ${depth}`);
@@ -79,13 +68,16 @@ export class ChessEngine {
 			this.worker.onmessage = (e: MessageEvent) => {
 				const line = String(e.data);
 
-				// Track the most recent score — overwrite on every depth
 				if (line.includes('score cp')) {
 					const match = line.match(/score cp (-?\d+)/);
-					if (match) lastScore = parseInt(match[1], 10);
+					if (match) {
+						const rawCp = parseInt(match[1], 10);
+						// Normalize to White perspective:
+						// If Black to move, SF +100 means White is -100.
+						lastScore = (turn === 'w') ? rawCp : -rawCp;
+					}
 				}
 
-				// Resolve only when the search is fully complete
 				if (line.startsWith('bestmove')) {
 					this.worker!.onmessage = originalHandler;
 					resolve(lastScore);

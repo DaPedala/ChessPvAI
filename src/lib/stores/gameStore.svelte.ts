@@ -1,64 +1,66 @@
 import { Chess } from 'chess.js';
-import type { GamePhase, EvaluatedMove, LastConfig } from '$lib/types';
+import type { GamePhase, EvaluatedMove, LastConfig, ChessColor } from '$lib/types';
 import { categorizeMove } from '$lib/utils/moveCategories';
 import { exportGame } from '$lib/utils/exportService';
 
-/** Returns ISO-8601 timestamp in local time with correct UTC offset. */
 function localISOString(): string {
-	const now    = new Date();
+	const now = new Date();
 	const offset = -now.getTimezoneOffset();
-	const sign   = offset >= 0 ? '+' : '-';
-	const pad    = (n: number) => String(Math.abs(n)).padStart(2, '0');
-	const hh     = pad(Math.floor(Math.abs(offset) / 60));
-	const mm     = pad(Math.abs(offset) % 60);
-	const local  = new Date(now.getTime() + offset * 60000);
+	const sign = offset >= 0 ? '+' : '-';
+	const pad = (n: number) => String(Math.abs(n)).padStart(2, '0');
+	const hh = pad(Math.floor(Math.abs(offset) / 60));
+	const mm = pad(Math.abs(offset) % 60);
+	const local = new Date(now.getTime() + offset * 60000);
 	return local.toISOString().replace('Z', `${sign}${hh}:${mm}`);
 }
 
 class GameStore {
 	game = new Chess();
-
-	currentPhase  = $state<GamePhase>('MENU');
-	statusText    = $state('Awaiting Configuration');
-
-	moveHistoryJSON   = $state<EvaluatedMove[]>([]);
-	previousEval      = $state(0);
-	hasExported       = $state(false);
-
-	/** Index of the move being previewed in the log, or null = live position. */
+	currentPhase = $state<GamePhase>('MENU');
+	statusText = $state('Awaiting Configuration');
+	moveHistoryJSON = $state<EvaluatedMove[]>([]);
+	
+	// Always White-centric. Starts at ~20cp (White's opening advantage)
+	previousEval = $state(20); 
+	
+	hasExported = $state(false);
 	selectedMoveIndex = $state<number | null>(null);
-
-	sessionUsername   = $state('Player1');
-	matchCounter      = $state(1);
+	sessionUsername = $state('Player1');
+	matchCounter = $state(1);
 	activeMatchNumber = $state(1);
-	activeChessType   = $state('Unknown');
-	lastConfig        = $state<LastConfig>({ base: 0, inc: 0, type: '' });
-
-	playerTime    = $state(0);
-	aiTime        = $state(0);
+	activeChessType = $state('Unknown');
+	lastConfig = $state<LastConfig>({ base: 0, inc: 0, type: '' });
+	
+	playerTime = $state(0);
+	aiTime = $state(0);
 	timeIncrement = $state(0);
-	isPlayerTurn  = $state(true);
-	aiSkillLevel  = $state(20);
+	isPlayerTurn = $state(true);
+	playerColor = $state<ChessColor>('w');
+	aiSkillLevel = $state(20);
 
 	private timerInterval: ReturnType<typeof setInterval> | null = null;
 
-	startGame(base: number, inc: number, type: string) {
+	startGame(base: number, inc: number, type: string, color: ChessColor | 'random' = 'w') {
 		if (!this.sessionUsername.trim()) {
 			alert('Identity required before starting a game.');
 			return;
 		}
-		this.lastConfig        = { base, inc, type };
+
+		this.playerColor = color === 'random' ? (Math.random() > 0.5 ? 'w' : 'b') : color;
+		this.lastConfig = { base, inc, type };
 		this.activeMatchNumber = this.matchCounter;
-		this.playerTime        = base;
-		this.aiTime            = base;
-		this.timeIncrement     = inc;
-		this.activeChessType   = type;
-		this.currentPhase      = 'PLAYING';
-		this.statusText        = `Your turn  ·  AI Level ${this.aiSkillLevel}`;
+		this.playerTime = base;
+		this.aiTime = base;
+		this.timeIncrement = inc;
+		this.activeChessType = type;
+		this.currentPhase = 'PLAYING';
+		this.isPlayerTurn = (this.playerColor === 'w');
+		this.statusText = this.isPlayerTurn ? 'Your turn' : 'AI is thinking…';
+		this.previousEval = 20; 
 	}
 
 	startClock() {
-		if (this.timerInterval) return;   // idempotent — only start once
+		if (this.timerInterval) return;
 		this.timerInterval = setInterval(() => {
 			if (this.currentPhase === 'TERMINATED') { this.stopClock(); return; }
 			if (this.isPlayerTurn) {
@@ -72,11 +74,14 @@ class GameStore {
 	}
 
 	stopClock() {
-		if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+		if (this.timerInterval) {
+			clearInterval(this.timerInterval);
+			this.timerInterval = null;
+		}
 	}
 
 	handleTermination(reason: string) {
-		this.statusText   = reason;
+		this.statusText = reason;
 		this.currentPhase = 'TERMINATED';
 		this.stopClock();
 		this.triggerAutoExport();
@@ -84,52 +89,44 @@ class GameStore {
 
 	updateStatus() {
 		if (this.game.isGameOver()) {
-			if      (this.game.isCheckmate()) this.handleTermination('Checkmate!');
-			else if (this.game.isDraw())      this.handleTermination('Draw!');
-			else                              this.handleTermination('Game Over');
+			if (this.game.isCheckmate()) this.handleTermination('Checkmate!');
+			else if (this.game.isDraw()) this.handleTermination('Draw!');
+			else this.handleTermination('Game Over');
 		} else {
 			this.statusText = this.isPlayerTurn ? 'Your turn' : 'AI is thinking…';
 		}
 	}
 
-	recordPlayerMove(san: string, rawEval: number) {
-		// Capture FEN after the move has already been applied to this.game
-		const fen = this.game.fen();
+	recordPlayerMove(san: string, currentEvalWhite: number) {
+		// Since .move() was already called on the chess object, 
+		// the color who JUST moved is the opposite of the current turn.
+		const movedColor = this.game.turn() === 'w' ? 'b' : 'w';
 
-		const perspectiveEval = this.game.turn() === 'b' ? -rawEval : rawEval;
-		const cpl = Math.max(0, this.previousEval - perspectiveEval);
-		const { category, value } = categorizeMove(cpl);
+		// Categorize using the delta between previous state and current state
+		const { category, value } = categorizeMove(currentEvalWhite, this.previousEval, movedColor);
 
-		this.moveHistoryJSON.push({ san, fen, category, value, evalCp: perspectiveEval });
-		this.previousEval = perspectiveEval;
+		this.moveHistoryJSON.push({
+			san,
+			fen: this.game.fen(),
+			category,
+			value,
+			evalCp: currentEvalWhite
+		});
 
-		// Always stay on live position while game is in progress
+		this.previousEval = currentEvalWhite;
 		this.selectedMoveIndex = null;
 	}
 
-	/**
-	 * Called by MoveLog when user clicks a move row.
-	 * Clicking the already-selected move deselects (returns to live board).
-	 */
 	selectMove(index: number) {
 		if (this.selectedMoveIndex === index) {
-			// Deselect → return to live → resume clock
 			this.selectedMoveIndex = null;
-			if (this.currentPhase === 'PLAYING') {
-				this.startClock();
-				this.statusText = this.isPlayerTurn ? 'Your turn' : 'AI is thinking…';
-			}
+			if (this.currentPhase === 'PLAYING') this.startClock();
 		} else {
-			// Enter replay → pause clock
 			this.selectedMoveIndex = index;
 			this.stopClock();
-			if (this.currentPhase === 'PLAYING') {
-				this.statusText = `Reviewing move ${index + 1} — paused`;
-			}
 		}
 	}
 
-	/** FEN to display — either the selected historical position or the live board. */
 	get displayFen(): string {
 		if (this.selectedMoveIndex !== null && this.moveHistoryJSON[this.selectedMoveIndex]) {
 			return this.moveHistoryJSON[this.selectedMoveIndex].fen;
@@ -137,27 +134,26 @@ class GameStore {
 		return this.game.fen();
 	}
 
-		async triggerAutoExport() {
-    if (this.hasExported || this.moveHistoryJSON.length === 0) return;
-    this.hasExported = true;
-    try {
-        const file = await exportGame(
-            {
-                session_id:         crypto.randomUUID(),
-                username:           this.sessionUsername.trim(),
-                match_number:       this.activeMatchNumber,
-                chess_type:         this.activeChessType,
-                time_base:          this.lastConfig.base,           // ← ADD
-                time_increment_sec: this.lastConfig.inc,            // ← ADD
-                ai_skill_level:     this.aiSkillLevel,
-                timestamp:          localISOString(),
-                moves_count:        this.moveHistoryJSON.length,
-                termination_reason: this.statusText,
-                time_control:       `${this.playerTime} base | ${this.timeIncrement} inc`
-            },
-            this.moveHistoryJSON
-        );	
-			console.log(`[ETL SUCCESS]: /data/${file}`);
+	async triggerAutoExport() {
+		if (this.hasExported || this.moveHistoryJSON.length === 0) return;
+		this.hasExported = true;
+		try {
+			await exportGame(
+				{
+					session_id: crypto.randomUUID(),
+					username: this.sessionUsername.trim(),
+					match_number: this.activeMatchNumber,
+					chess_type: this.activeChessType,
+					time_base: this.lastConfig.base,
+					time_increment_sec: this.lastConfig.inc,
+					ai_skill_level: this.aiSkillLevel,
+					timestamp: localISOString(),
+					moves_count: this.moveHistoryJSON.length,
+					termination_reason: this.statusText,
+					time_control: `${this.lastConfig.base/60}+${this.lastConfig.inc}`
+				},
+				this.moveHistoryJSON
+			);
 			this.matchCounter++;
 		} catch (e) {
 			console.error('[ETL FATAL]:', e);
@@ -167,23 +163,24 @@ class GameStore {
 
 	clearBoardState() {
 		this.game.reset();
-		this.moveHistoryJSON  = [];
-		this.previousEval     = 0;
-		this.hasExported      = false;
-		this.isPlayerTurn     = true;
+		this.moveHistoryJSON = [];
+		this.previousEval = 20;
+		this.hasExported = false;
 		this.selectedMoveIndex = null;
 		this.stopClock();
 	}
 
 	executeRematch() {
+		const oldColor = this.playerColor;
+		const config = { ...this.lastConfig };
 		this.clearBoardState();
-		this.startGame(this.lastConfig.base, this.lastConfig.inc, this.lastConfig.type);
+		this.startGame(config.base, config.inc, config.type, oldColor === 'w' ? 'b' : 'w');
 	}
 
 	goToMenu() {
 		this.clearBoardState();
 		this.currentPhase = 'MENU';
-		this.statusText   = 'Awaiting Configuration';
+		this.statusText = 'Awaiting Configuration';
 	}
 }
 
