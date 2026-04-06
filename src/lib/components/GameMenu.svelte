@@ -1,6 +1,7 @@
 <script lang="ts">
     import { gameStore } from '$lib/stores/gameStore.svelte';
     import { TIME_CONTROLS } from '$lib/constants';
+    import { i18n } from '$lib/stores/langStore';
 
     let showCustomForm   = $state(false);
     let customMinutes    = $state(10);
@@ -20,52 +21,59 @@
 
 <div class="menu-container">
     <div class="config-section">
-        <label for="username" class="field-label">Username</label>
+        <label for="username" class="field-label">{$i18n.menu_username}</label>
         <input type="text" id="username" bind:value={gameStore.sessionUsername} class="text-input" placeholder="Enter your username…" />
     </div>
 
     <div class="config-section">
         <label for="skillLevel" class="field-label">
-            AI Strength
+            {$i18n.menu_ai_strength}
             <span class="skill-value">
-                {gameStore.aiSkillLevel === 20 ? 'Maximum' : gameStore.aiSkillLevel === 0 ? 'Beginner' : `Level ${gameStore.aiSkillLevel}`}
+                {gameStore.aiSkillLevel === 20 ? $i18n.menu_maximum : gameStore.aiSkillLevel === 0 ? $i18n.menu_beginner : `${$i18n.menu_level} ${gameStore.aiSkillLevel}`}
             </span>
         </label>
         <input type="range" id="skillLevel" min="0" max="20" bind:value={gameStore.aiSkillLevel} class="range-slider" />
     </div>
 
     <div class="config-section">
-        <label class="field-label">Play as</label>
+        <label class="field-label">{$i18n.menu_play_as}</label>
         <div class="side-picker">
-            <button class="side-btn" class:active={selectedSide === 'w'} onclick={() => selectedSide = 'w'}>White</button>
-            <button class="side-btn" class:active={selectedSide === 'random'} onclick={() => selectedSide = 'random'}>Random</button>
-            <button class="side-btn" class:active={selectedSide === 'b'} onclick={() => selectedSide = 'b'}>Black</button>
+            <button class="side-btn" class:active={selectedSide === 'w'} onclick={() => selectedSide = 'w'}>{$i18n.menu_white}</button>
+            <button class="side-btn" class:active={selectedSide === 'random'} onclick={() => selectedSide = 'random'}>{$i18n.menu_random}</button>
+            <button class="side-btn" class:active={selectedSide === 'b'} onclick={() => selectedSide = 'b'}>{$i18n.menu_black}</button>
         </div>
     </div>
 
     {#if !showCustomForm}
         <div class="tc-grid">
             {#each TIME_CONTROLS as tc}
-                <button class="tc-btn" onclick={() => handleTimeControl(tc.base, tc.inc, tc.type)}>
-                    <span class="tc-label">{tc.label}</span>
-                    <span class="tc-type">{tc.type}</span>
-                </button>
+            	<button class="tc-btn" onclick={() => handleTimeControl(tc.base, tc.inc, tc.type)}>
+            		<span class="tc-label">
+            			{tc.label === 'Custom'
+            				? $i18n.tc_custom
+            				: tc.label}
+            		</span>
+                
+            		<span class="tc-type">
+            			{$i18n[`tc_${tc.type.toLowerCase()}`]}
+            		</span>
+            	</button>
             {/each}
         </div>
     {:else}
         <div class="custom-form">
-            <p class="custom-title">Custom time control</p>
+            <p class="custom-title">{$i18n.menu_custom_title}</p>
             <div class="input-group">
-                <label for="customMin">Minutes per side</label>
+                <label for="customMin">{$i18n.menu_minutes}</label>
                 <input type="number" id="customMin" min="1" max="180" bind:value={customMinutes} />
             </div>
             <div class="input-group">
-                <label for="customInc">Increment (seconds)</label>
+                <label for="customInc">{$i18n.menu_increment}</label>
                 <input type="number" id="customInc" min="0" max="180" bind:value={customIncSeconds} />
             </div>
             <div class="form-actions">
-                <button class="btn btn-secondary" onclick={() => showCustomForm = false}>Cancel</button>
-                <button class="btn btn-primary" onclick={startCustomGame}>Start game</button>
+                <button class="btn btn-secondary" onclick={() => showCustomForm = false}>{$i18n.menu_cancel}</button>
+                <button class="btn btn-primary" onclick={startCustomGame}>{$i18n.menu_start}</button>
             </div>
         </div>
     {/if}

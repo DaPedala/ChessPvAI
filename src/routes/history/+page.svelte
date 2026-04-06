@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { Chess } from 'chess.js';
-	import { CATEGORY_COLOR } from '$lib/utils/moveCategories';
+    import { onMount } from 'svelte';
+    import { Chess } from 'chess.js';
+    import { CATEGORY_COLOR } from '$lib/utils/moveCategories';
+    import { i18n } from '$lib/stores/langStore';
 	import { formatTime } from '$lib/utils/timeFormat';
 
 	// ── Types ─────────────────────────────────────────────────────────────────
@@ -141,17 +142,17 @@
 
 	<!-- ── Header ──────────────────────────────────────────────────────────── -->
 	<div class="header">
-		<a href="/" class="back">← Back to game</a>
-		<h1 class="title">Game History</h1>
+		<a href="/" class="back">{$i18n.hist_back}</a>
+		<h1 class="title">{$i18n.hist_title}</h1>
 	</div>
 
 	{#if loading}
-		<p class="empty">Loading…</p>
+		<p class="empty">$i18n.hist_loading</p>
 
 	{:else if !selected}
 		<!-- ── Game list ──────────────────────────────────────────────────── -->
 		{#if games.length === 0}
-			<p class="empty">No games saved yet.</p>
+			<p class="empty">{$i18n.hist_empty}</p>
 		{:else}
 			<div class="game-list">
 				{#each games as g}
@@ -190,7 +191,7 @@
 			<!-- Board column -->
 			<div class="review-left">
 				<div class="review-header">
-					<button class="back-btn" onclick={closeReview}>← All games</button>
+					<button class="back-btn" onclick={closeReview}>{$i18n.hist_all}</button>
 					<span class="review-title">
 						{selected.metadata.username} · Match #{selected.metadata.match_number} · {selected.metadata.chess_type} · {formatTimeControl(selected.metadata)}
 					</span>
@@ -207,7 +208,7 @@
 							Move {reviewIndex + 1} of {selected.data.length}
 							— <strong>{selected.data[reviewIndex].san}</strong>
 						{:else}
-							Starting position
+							{$i18n.hist_start}
 						{/if}
 					</span>
 
@@ -217,23 +218,25 @@
 				<!-- Game summary -->
 				<div class="summary">
 					<div class="summary-row">
-						<span class="summary-label">Result</span>
+						<span class="summary-label">{$i18n.hist_result}</span>
 						<span class="summary-val">{selected.metadata.termination_reason}</span>
 					</div>
 					<div class="summary-row">
-						<span class="summary-label">Time Control</span>
-						<span class="summary-val">{formatTimeControl(selected.metadata)}</span>
+					    <span class="summary-label">{$i18n.hist_time}</span>
+					    <span class="summary-val">
+					        {formatTime(selected.metadata.time_base)} + {selected.metadata.time_increment_sec}s
+					    </span>
 					</div>
 					<div class="summary-row">
 						<span class="summary-label">avgCPL</span>
 						<span class="summary-val">{avgCPL(selected.data)}</span>
 					</div>
 					<div class="summary-row">
-						<span class="summary-label">Moves</span>
+						<span class="summary-label">{$i18n.hist_moves}</span>
 						<span class="summary-val">{selected.data.length}</span>
 					</div>
 					<div class="summary-row">
-						<span class="summary-label">Played</span>
+						<span class="summary-label">{$i18n.hist_played}</span>
 						<span class="summary-val">{new Date(selected.metadata.timestamp).toLocaleString()}</span>
 					</div>
 				</div>
@@ -242,7 +245,7 @@
 			<!-- Move log column -->
 			<div class="review-right">
 				<div class="log-header">
-					<span class="log-title">Move Analysis</span>
+					<span class="log-title">{$i18n.hist_analysis}</span>
 					<span class="log-cpl">avgCPL {avgCPL(selected.data)}</span>
 				</div>
 

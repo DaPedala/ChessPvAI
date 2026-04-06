@@ -3,6 +3,15 @@ import type { GamePhase, EvaluatedMove, LastConfig, ChessColor } from '$lib/type
 import { categorizeMove } from '$lib/utils/moveCategories';
 import { exportGame } from '$lib/utils/exportService';
 
+import { get } from 'svelte/store';
+import { lang } from '$lib/stores/langStore';
+import { t } from '$lib/lang';
+
+// Helper to get current translation
+function tr(key: keyof typeof t.en): string {
+    return t[get(lang)][key];
+}
+
 function localISOString(): string {
 	const now = new Date();
 	const offset = -now.getTimezoneOffset();
@@ -17,7 +26,7 @@ function localISOString(): string {
 class GameStore {
 	game = new Chess();
 	currentPhase = $state<GamePhase>('MENU');
-	statusText = $state('Awaiting Configuration');
+	statusText = $state(tr('status_awaiting'));
 	moveHistoryJSON = $state<EvaluatedMove[]>([]);
 	
 	// Always White-centric. Starts at ~20cp (White's opening advantage)
@@ -42,7 +51,7 @@ class GameStore {
 
 	startGame(base: number, inc: number, type: string, color: ChessColor | 'random' = 'w') {
 		if (!this.sessionUsername.trim()) {
-			alert('Identity required before starting a game.');
+			alert(tr('alert_username'));
 			return;
 		}
 
@@ -55,7 +64,7 @@ class GameStore {
 		this.activeChessType = type;
 		this.currentPhase = 'PLAYING';
 		this.isPlayerTurn = (this.playerColor === 'w');
-		this.statusText = this.isPlayerTurn ? 'Your turn' : 'AI is thinking…';
+		this.statusText = this.isPlayerTurn ? tr('status_your_turn') : tr('status_ai_thinking');
 		this.previousEval = 20; 
 	}
 
@@ -65,10 +74,10 @@ class GameStore {
 			if (this.currentPhase === 'TERMINATED') { this.stopClock(); return; }
 			if (this.isPlayerTurn) {
 				this.playerTime--;
-				if (this.playerTime <= 0) this.handleTermination('Timeout: AI Wins');
+				if (this.playerTime <= 0) this.handleTermination(tr('status_timeout_ai'));
 			} else {
 				this.aiTime--;
-				if (this.aiTime <= 0) this.handleTermination('Timeout: Player Wins');
+				if (this.aiTime <= 0) this.handleTermination(tr('status_timeout_player'));
 			}
 		}, 1000);
 	}
@@ -89,11 +98,11 @@ class GameStore {
 
 	updateStatus() {
 		if (this.game.isGameOver()) {
-			if (this.game.isCheckmate()) this.handleTermination('Checkmate!');
-			else if (this.game.isDraw()) this.handleTermination('Draw!');
-			else this.handleTermination('Game Over');
+			if (this.game.isCheckmate()) this.handleTermination(tr('status_checkmate'));
+			else if (this.game.isDraw()) this.handleTermination(tr('status_draw'));
+			else this.handleTermination(tr('status_game_over'));
 		} else {
-			this.statusText = this.isPlayerTurn ? 'Your turn' : 'AI is thinking…';
+			this.statusText = this.isPlayerTurn ? tr('status_your_turn') : tr('status_ai_thinking');
 		}
 	}
 
@@ -180,7 +189,7 @@ class GameStore {
 	goToMenu() {
 		this.clearBoardState();
 		this.currentPhase = 'MENU';
-		this.statusText = 'Awaiting Configuration';
+		this.statusText = tr('status_awaiting');
 	}
 }
 

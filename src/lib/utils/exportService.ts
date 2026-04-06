@@ -20,9 +20,11 @@ export async function exportGame(
 	const res = await fetch('/api/export', {
 		method: 'POST',
 		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({ metadata, data })
+		body: JSON.stringify({ game: metadata, moves: data })
 	});
 	if (!res.ok) throw new Error(`Export API rejected with status ${res.status}`);
-	const { file } = await res.json();
+	const result = await res.json();
+	if (!result.ok) throw new Error('Export failed');
+	return metadata.session_id; // return something useful instead
 	return file;
 }

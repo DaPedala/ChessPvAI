@@ -1,18 +1,19 @@
 <script lang="ts">
-	import { gameStore } from '$lib/stores/gameStore.svelte';
-	import { formatTime } from '$lib/utils/timeFormat';
+    import { gameStore } from '$lib/stores/gameStore.svelte';
+    import { formatTime } from '$lib/utils/timeFormat';
+    import { i18n } from '$lib/stores/langStore';
 </script>
 
 <div class="clock-bar">
-	<div class="clock-side" class:active={gameStore.isPlayerTurn}>
-		<span class="clock-name">{gameStore.sessionUsername}</span>
-		<span class="clock-time">{formatTime(gameStore.playerTime)}</span>
-	</div>
-	<span class="vs">vs</span>
-	<div class="clock-side clock-right" class:active={!gameStore.isPlayerTurn}>
-		<span class="clock-name">Engine</span>
-		<span class="clock-time">{formatTime(gameStore.aiTime)}</span>
-	</div>
+    <div class="clock-side" class:active={gameStore.isPlayerTurn}>
+        <span class="clock-name">{gameStore.sessionUsername}</span>
+        <span class="clock-time">{formatTime(gameStore.playerTime)}</span>
+    </div>
+    <span class="vs">vs</span>
+    <div class="clock-side clock-right" class:active={!gameStore.isPlayerTurn}>
+        <span class="clock-name">{$i18n.clock_engine}</span>
+        <span class="clock-time">{formatTime(gameStore.aiTime)}</span>
+    </div>
 </div>
 
 <style>

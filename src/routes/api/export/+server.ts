@@ -1,60 +1,137 @@
-import { json } from '@sveltejs/kit';
-import fs from 'node:fs/promises';
-import path from 'node:path';
+import { json, error } from '@sveltejs/kit';
+import type { RequestHandler } from './$types';
+import sql from '$lib/server/db';
 
-export async function POST({ request }) {
+export const POST: RequestHandler = async ({ request }) => {
+	let body: unknown;
+
 	try {
-		const payload = await request.json();
-		const meta = payload.metadata;
-
-
-        // +server.ts — in the POST handler
-        const safeUsername = String(meta.username || 'Anonymous').replace(/[^a-z0-9]/gi, '_');
-        const safeChessType = String(meta.chess_type).replace(/^Custom_[\d.]+_[\d.]+$/, 'Custom'); // ← ADD
-
-        const baseMin = meta.time_base / 60;
-        const baseStr = Number.isInteger(baseMin) ? String(baseMin) : baseMin.toFixed(1);
-        const timeStr = `${baseStr}+${meta.time_increment_sec}`;
-
-        const filename = `${safeUsername}_${meta.match_number}_${safeChessType}_${timeStr}_${meta.ai_skill_level}.json`;
-
-
-		const dir = path.join(process.cwd(), 'data');
-		await fs.mkdir(dir, { recursive: true });
-		const filepath = path.join(dir, filename);
-
-		await fs.writeFile(filepath, JSON.stringify(payload, null, 2));
-
-		return json({ success: true, file: filename }, { status: 200 });
-	} catch (error) {
-		console.error('[I/O FATAL]:', error);
-		return json({ error: 'Failed to write JSON to disk' }, { status: 500 });
+		body = await request.json();
+	} catch {
+		throw error(400, 'Invalid JSON body');
 	}
-}
 
-/** Returns all saved games sorted by timestamp descending. */
-export async function GET() {
+	const { game, moves } = body as {
+		game: {
+			session_id:         string;
+			username:           string;
+			match_number:       number;
+			chess_type:         string;
+			time_base:          number;
+			time_increment_sec: number;
+			time_control:       string;
+			ai_skill_level:     number;
+			moves_count:        number;
+			termination_reason: string;
+			timestamp:          string;
+		};
+		moves: Array<{
+			san:      string;
+			fen:      string;
+			category: string;
+			value:    number;
+			evalCp:   number;
+		}>;
+	};
+
+	if (!game?.session_id || !Array.isArray(moves)) {
+		throw error(400, 'Missing game or moves data');
+	}
+
 	try {
-		const dir = path.join(process.cwd(), 'data');
-		await fs.mkdir(dir, { recursive: true });
-		const files = await fs.readdir(dir);
+		// Wrap both inserts in a transaction — either both succeed or neither does
+		await sql.begin(async (tx) => {
+			await tx`
+				INSERT INTO games (
+					session_id,
+					username,
+					match_number,
+					chess_type,
+					time_base,
+					time_increment_sec,
+					time_control,
+					ai_skill_level,
+					moves_count,
+					termination_reason,
+					played_at
+				) VALUES (
+					${game.session_id},
+					${game.username},
+					${game.match_number},
+					${game.chess_type},
+					${game.time_base},
+					${game.time_increment_sec},
+					${game.time_control},
+					${game.ai_skill_level},
+					${game.moves_count},
+					${game.termination_reason},
+					${game.timestamp}
+				)
+			`;
 
-		const games = await Promise.all(
-			files
-				.filter(f => f.endsWith('.json'))
-				.map(async f => {
-					const raw = await fs.readFile(path.join(dir, f), 'utf-8');
-					return JSON.parse(raw);
-				})
-		);
+			if (moves.length > 0) {
+				await tx`
+					INSERT INTO moves ${tx(
+						moves.map((m, i) => ({
+							session_id:  game.session_id,
+							move_number: i + 1,
+							san:         m.san,
+							fen:         m.fen,
+							category:    m.category,
+							value:       m.value,
+							eval_cp:     m.evalCp,
+						}))
+					)}
+				`;
+			}
+		});
 
-		games.sort((a, b) =>
-			new Date(b.metadata.timestamp).getTime() - new Date(a.metadata.timestamp).getTime()
-		);
-
-		return json(games);
-	} catch (error) {
-		console.error('[READ FATAL]:', error);
-		return json({ error: 'Failed to read games' }, { status: 500 });
+		return json({ ok: true });
+	} catch (e) {
+		console.error('[DB] Export failed:', e);
+		throw error(500, 'Database write failed');
 	}
-}
+};
+
+export const GET: RequestHandler = async () => {
+    try {
+        const games = await sql`
+            SELECT * FROM games ORDER BY played_at DESC
+        `;
+        const result = await Promise.all(
+            games.map(async (game) => {
+                const moves = await sql`
+                    SELECT * FROM moves
+                    WHERE session_id = ${game.session_id}
+                    ORDER BY move_number ASC
+                `;
+                return {
+                    metadata: {
+                        session_id:         game.session_id,
+                        username:           game.username,
+                        match_number:       game.match_number,
+                        chess_type:         game.chess_type,
+                        time_base:          game.time_base,
+                        time_increment_sec: game.time_increment_sec,
+                        time_control:       game.time_control,
+                        ai_skill_level:     game.ai_skill_level,
+                        moves_count:        game.moves_count,
+                        termination_reason: game.termination_reason,
+                        timestamp:          game.played_at,
+                    },
+                    data: moves.map(m => ({
+                        san:      m.san,
+                        fen:      m.fen,
+                        category: m.category,
+                        value:    m.value,
+                        evalCp:   m.eval_cp,
+                    }))
+                };
+            })
+        );
+        return json(result);
+    } catch (e) {
+        console.error('[DB] Read failed:', e);
+        throw error(500, 'Database read failed');
+    }
+};

@@ -1,73 +1,74 @@
 <script lang="ts">
-	import { gameStore } from '$lib/stores/gameStore.svelte';
-	import { CATEGORY_COLOR } from '$lib/utils/moveCategories';
+    import { gameStore } from '$lib/stores/gameStore.svelte';
+    import { CATEGORY_COLOR } from '$lib/utils/moveCategories';
+    import { i18n } from '$lib/stores/langStore';
 
-	const GLYPH: Record<string, string> = {
-		best: '!', excellent: '!', good: '', inaccuracy: '?!', mistake: '?', blunder: '??',
-	};
+    const GLYPH: Record<string, string> = {
+        best: '!', excellent: '!', good: '', inaccuracy: '?!', mistake: '?', blunder: '??',
+    };
 </script>
 
 <div class="log-col">
-	<div class="log-header">
-		<span class="log-title">Move Analysis</span>
-		<span class="log-match">Match #{gameStore.activeMatchNumber}</span>
-	</div>
+    <div class="log-header">
+        <span class="log-title">{$i18n.log_title}</span>
+        <span class="log-match">Match #{gameStore.activeMatchNumber}</span>
+    </div>
 
-	{#if gameStore.selectedMoveIndex !== null}
-		<div class="replay-bar">
-			<button
-				class="replay-nav"
-				disabled={gameStore.selectedMoveIndex === 0}
-				onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex! - 1)}
-			>‹</button>
+    {#if gameStore.selectedMoveIndex !== null}
+        <div class="replay-bar">
+            <button
+                class="replay-nav"
+                disabled={gameStore.selectedMoveIndex === 0}
+                onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex! - 1)}
+            >‹</button>
 
-			<span class="replay-label">
-				Move {gameStore.selectedMoveIndex + 1} of {gameStore.moveHistoryJSON.length}
-			</span>
+            <span class="replay-label">
+                Move {gameStore.selectedMoveIndex + 1} {$i18n.log_move_of} {gameStore.moveHistoryJSON.length}
+            </span>
 
-			<button
-				class="replay-nav"
-				disabled={gameStore.selectedMoveIndex === gameStore.moveHistoryJSON.length - 1}
-				onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex! + 1)}
-			>›</button>
+            <button
+                class="replay-nav"
+                disabled={gameStore.selectedMoveIndex === gameStore.moveHistoryJSON.length - 1}
+                onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex! + 1)}
+            >›</button>
 
-			<button class="replay-live" onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex!)}>
-				↩ Live
-			</button>
-		</div>
-	{/if}
+            <button class="replay-live" onclick={() => gameStore.selectMove(gameStore.selectedMoveIndex!)}>
+                {$i18n.log_live}
+            </button>
+        </div>
+    {/if}
 
-	<div class="log-scroll">
-		{#each gameStore.moveHistoryJSON as record, i}
-			<button
-				class="log-row"
-				class:selected={gameStore.selectedMoveIndex === i}
-				onclick={() => gameStore.selectMove(i)}
-				title="View position after {record.san}"
-			>
-				<span class="log-num">{i + 1}.</span>
-				<span class="log-san">{record.san}</span>
+    <div class="log-scroll">
+        {#each gameStore.moveHistoryJSON as record, i}
+            <button
+                class="log-row"
+                class:selected={gameStore.selectedMoveIndex === i}
+                onclick={() => gameStore.selectMove(i)}
+                title="View position after {record.san}"
+            >
+                <span class="log-num">{i + 1}.</span>
+                <span class="log-san">{record.san}</span>
 
-				{#if GLYPH[record.category]}
-					<span class="log-glyph" style="color:{CATEGORY_COLOR[record.category]}">
-						{GLYPH[record.category]}
-					</span>
-				{/if}
+                {#if GLYPH[record.category]}
+                    <span class="log-glyph" style="color:{CATEGORY_COLOR[record.category]}">
+                        {GLYPH[record.category]}
+                    </span>
+                {/if}
 
-				<span class="log-cat" style="color:{CATEGORY_COLOR[record.category]}">
-					{record.category}
-				</span>
+                <span class="log-cat" style="color:{CATEGORY_COLOR[record.category]}">
+                    {record.category}
+                </span>
 
-				<span class="log-eval">
-					{record.evalCp > 0 ? '+' : ''}{(record.evalCp / 100).toFixed(2)}
-				</span>
-			</button>
-		{/each}
+                <span class="log-eval">
+                    {record.evalCp > 0 ? '+' : ''}{(record.evalCp / 100).toFixed(2)}
+                </span>
+            </button>
+        {/each}
 
-		{#if gameStore.moveHistoryJSON.length === 0}
-			<p class="log-empty">No moves yet</p>
-		{/if}
-	</div>
+        {#if gameStore.moveHistoryJSON.length === 0}
+            <p class="log-empty">{$i18n.log_empty}</p>
+        {/if}
+    </div>
 </div>
 
 <style>

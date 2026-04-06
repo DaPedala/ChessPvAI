@@ -1,14 +1,15 @@
 <script lang="ts">
-	import { gameStore } from '$lib/stores/gameStore.svelte';
+    import { gameStore } from '$lib/stores/gameStore.svelte';
+    import { i18n } from '$lib/stores/langStore';
 </script>
 
 <div class="post-game">
-	<button class="btn btn-primary" onclick={() => gameStore.executeRematch()}>
-		Rematch <span class="sub">#{gameStore.matchCounter}</span>
-	</button>
-	<button class="btn btn-secondary" onclick={() => gameStore.goToMenu()}>
-		New game
-	</button>
+    <button class="btn btn-primary" onclick={() => gameStore.executeRematch()}>
+        {$i18n.pg_rematch} <span class="sub">#{gameStore.matchCounter}</span>
+    </button>
+    <button class="btn btn-secondary" onclick={() => gameStore.goToMenu()}>
+        {$i18n.pg_new_game}
+    </button>
 </div>
 
 <style>
