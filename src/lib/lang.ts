@@ -10,6 +10,9 @@ export const t = {
         nav_leaderboard: 'Leaderboard',
         nav_play:        'Play now →',
         nav_home:        '← Home',
+        nav_login:       'Log in',
+        nav_register:    'Sign up',
+        nav_logout:      'Log out',
 
         // Hero
         hero_kicker:   'Stockfish · Real-time Analysis · Fischer Clock',
@@ -97,6 +100,7 @@ export const t = {
         menu_beginner:     'Beginner',
         menu_level:        'Level',
         menu_play_as:      'Play as',
+        menu_playing_as:   'Playing as',
         menu_white:        'White',
         menu_random:       'Random',
         menu_black:        'Black',
@@ -140,6 +144,36 @@ export const t = {
         status_timeout_ai: 'Timeout: AI Wins',
         status_timeout_player: 'Timeout: Player Wins',
         alert_username:    'Identity required before starting a game.',
+
+        // Auth pages
+        auth_email:            'Email',
+        auth_display_name:     'Display name',
+        auth_password:         'Password',
+        auth_confirm_password: 'Confirm password',
+        auth_register_title:   'Create account',
+        auth_register_sub:     'Start tracking your games.',
+        auth_register_btn:     'Create account',
+        auth_login_title:      'Welcome back',
+        auth_login_sub:        'Log in to continue playing.',
+        auth_login_btn:        'Log in',
+        auth_have_account:     'Already have an account?',
+        auth_login_link:       'Log in',
+        auth_no_account:       'No account yet?',
+        auth_register_link:    'Sign up',
+
+        // Account page
+        acc_title:            'Account',
+        acc_back:             'Back to game',
+        acc_display_name:     'Display name',
+        acc_display_name_desc:'This is the name shown on the leaderboard and in game history. Must be unique.',
+        acc_password:         'Password',
+        acc_password_desc:    'Change your login password.',
+        acc_current_pass:     'Current password',
+        acc_new_pass:         'New password',
+        acc_confirm_pass:     'Confirm new password',
+        acc_save:             'Save',
+        acc_name_saved:       'Display name updated.',
+        acc_pass_saved:       'Password updated.',
     },
 
     ro: {
@@ -151,6 +185,9 @@ export const t = {
         nav_leaderboard: 'Clasament',
         nav_play:        'Joacă acum →',
         nav_home:        '← Acasă',
+        nav_login:       'Autentificare',
+        nav_register:    'Înregistrare',
+        nav_logout:      'Deconectare',
 
         // Hero
         hero_kicker:   'Stockfish · Analiză în timp real · Ceas Fischer',
@@ -238,6 +275,7 @@ export const t = {
         menu_beginner:     'Începător',
         menu_level:        'Nivel',
         menu_play_as:      'Joacă ca',
+        menu_playing_as:   'Joci ca',
         menu_white:        'Alb',
         menu_random:       'Aleatoriu',
         menu_black:        'Negru',
@@ -281,5 +319,35 @@ export const t = {
         status_timeout_ai: 'Timp expirat: Motorul câștigă',
         status_timeout_player: 'Timp expirat: Jucătorul câștigă',
         alert_username:    'Nume de utilizator necesar înainte de a începe.',
+
+        // Auth pages
+        auth_email:            'Email',
+        auth_display_name:     'Nume afișat',
+        auth_password:         'Parolă',
+        auth_confirm_password: 'Confirmă parola',
+        auth_register_title:   'Creează cont',
+        auth_register_sub:     'Începe să îți urmărești partidele.',
+        auth_register_btn:     'Creează cont',
+        auth_login_title:      'Bine ai revenit',
+        auth_login_sub:        'Autentifică-te pentru a continua.',
+        auth_login_btn:        'Autentificare',
+        auth_have_account:     'Ai deja cont?',
+        auth_login_link:       'Autentificare',
+        auth_no_account:       'Nu ai cont?',
+        auth_register_link:    'Înregistrează-te',
+
+        // Account page
+        acc_title:            'Cont',
+        acc_back:             'Înapoi la joc',
+        acc_display_name:     'Nume afișat',
+        acc_display_name_desc:'Acesta este numele afișat pe clasament și în istoricul partidelor. Trebuie să fie unic.',
+        acc_password:         'Parolă',
+        acc_password_desc:    'Schimbă parola de autentificare.',
+        acc_current_pass:     'Parola curentă',
+        acc_new_pass:         'Parolă nouă',
+        acc_confirm_pass:     'Confirmă parola nouă',
+        acc_save:             'Salvează',
+        acc_name_saved:       'Nume afișat actualizat.',
+        acc_pass_saved:       'Parolă actualizată.',
     }
 } satisfies Record<Lang, Record<string, string>>;

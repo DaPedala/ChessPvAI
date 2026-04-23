@@ -4,7 +4,13 @@
     import { lang, i18n } from '$lib/stores/langStore';
     import type { Lang } from '$lib/lang';
 
-    let { children } = $props();
+    interface Props {
+        children: import('svelte').Snippet;
+        data: { user: { id: string; email: string; display_name: string } | null };
+    }
+    let { children, data }: Props = $props();
+
+    const user = $derived(data.user);
 
     const navLinks = $derived([
         { href: '/#features',   label: $i18n.nav_features },
@@ -15,6 +21,7 @@
     ]);
 
     const isPlay = $derived(page.url.pathname.startsWith('/play'));
+    const isAuth = $derived(page.url.pathname.startsWith('/auth'));
 
     function setLang(e: Event) {
         lang.set((e.target as HTMLSelectElement).value as Lang);
@@ -34,7 +41,7 @@
         <span class="logo-text">CHESS<em>PvAI</em></span>
     </a>
 
-    {#if !isPlay}
+    {#if !isPlay && !isAuth}
         <nav class="nav-links">
             {#each navLinks as link}
                 <a href={link.href}>{link.label}</a>
@@ -42,14 +49,30 @@
         </nav>
     {/if}
 
-    <select class="lang-select" value={$lang} onchange={setLang}>
-        <option value="en">🇬🇧 English</option>
-        <option value="ro">🇷🇴 Română</option>
-    </select>
+    <div class="nav-right">
+        <select class="lang-select" value={$lang} onchange={setLang}>
+            <option value="en">🇬🇧 English</option>
+            <option value="ro">🇷🇴 Română</option>
+        </select>
 
-    <a href={isPlay ? '/' : '/play'} class="nav-cta">
-        {isPlay ? $i18n.nav_home : $i18n.nav_play}
-    </a>
+        {#if user}
+            <a href="/account" class="nav-user">
+                <span class="user-icon">♟</span>
+                <span class="user-name">{user.display_name}</span>
+            </a>
+            <form method="POST" action="/auth/logout">
+                <button type="submit" class="nav-logout">{$i18n.nav_logout}</button>
+            </form>
+            {#if !isPlay}
+                <a href="/play" class="nav-cta">{$i18n.nav_play}</a>
+            {:else}
+                <a href="/" class="nav-cta">{$i18n.nav_home}</a>
+            {/if}
+        {:else if !isAuth}
+            <a href="/auth/login" class="nav-ghost">{$i18n.nav_login}</a>
+            <a href="/auth/register" class="nav-cta">{$i18n.nav_register}</a>
+        {/if}
+    </div>
 </header>
 
 <div class="page-body">
@@ -60,8 +83,8 @@
     <span class="footer-logo">♔ ChessPvAI</span>
     <span class="footer-copy">{$i18n.footer_built}</span>
     <a href="https://github.com/DaPedala/ChessPvAI" class="footer-link" target="_blank" rel="noopener noreferrer">
-		Github →
-	</a>
+        Github →
+    </a>
 </footer>
 
 <style>
@@ -113,12 +136,17 @@
     .logo-icon { font-size: 1.3rem; color: var(--accent); }
     .logo-text em { font-style: normal; color: var(--accent); }
 
-    .nav-links { display: flex; gap: 28px; margin-left: auto; }
+    .nav-links { display: flex; gap: 28px; }
     .nav-links a {
         font-size: .82rem; font-family: var(--mono); letter-spacing: .05em;
         color: var(--text-dim); transition: color .15s;
     }
     .nav-links a:hover { color: var(--text); }
+
+    .nav-right {
+        margin-left: auto;
+        display: flex; align-items: center; gap: 12px;
+    }
 
     .lang-select {
         font-family: var(--mono); font-size: .78rem;
@@ -129,6 +157,35 @@
         appearance: none;
     }
     .lang-select:hover { border-color: var(--accent); }
+
+    .nav-user {
+        display: flex; align-items: center; gap: 6px;
+        font-family: var(--mono); font-size: .8rem;
+        color: var(--text-dim);
+        border: 1px solid var(--border); border-radius: 2px;
+        padding: 6px 12px;
+        transition: color .15s, border-color .15s;
+    }
+    .nav-user:hover { color: var(--text); border-color: rgba(255,255,255,.2); }
+    .user-icon { color: var(--accent); }
+    .user-name { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .nav-logout {
+        font-family: var(--mono); font-size: .78rem;
+        background: none; border: none;
+        color: var(--text-dim); cursor: pointer;
+        padding: 6px 4px;
+        transition: color .15s;
+    }
+    .nav-logout:hover { color: #cc1900; }
+
+    .nav-ghost {
+        font-family: var(--mono); font-size: .82rem;
+        color: var(--text-dim);
+        padding: 7px 14px;
+        transition: color .15s;
+    }
+    .nav-ghost:hover { color: var(--text); }
 
     .nav-cta {
         font-family: var(--mono); font-size: .82rem; font-weight: 700;

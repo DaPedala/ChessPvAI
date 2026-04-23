@@ -6,7 +6,7 @@
 
 <div class="clock-bar">
     <div class="clock-side" class:active={gameStore.isPlayerTurn}>
-        <span class="clock-name">{gameStore.sessionUsername}</span>
+        <span class="clock-name">{gameStore.displayName}</span>
         <span class="clock-time">{formatTime(gameStore.playerTime)}</span>
     </div>
     <span class="vs">vs</span>

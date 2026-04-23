@@ -161,8 +161,8 @@
 						<div class="card-top">
 							<span class="card-user">{g.metadata.username}</span>
 							<span class="card-match">Match #{g.metadata.match_number}</span>
-							<span class="card-result" class:win={g.metadata.termination_reason.includes('Player')} class:loss={g.metadata.termination_reason.includes('AI') || g.metadata.termination_reason.includes('Checkmate')}>
-								{g.metadata.termination_reason}
+							<span class="card-result" class:win={g.metadata.termination_reason === 'status_timeout_player'} class:loss={g.metadata.termination_reason === 'status_timeout_ai' || g.metadata.termination_reason === 'status_checkmate'}>
+								{($i18n as Record<string,string>)[g.metadata.termination_reason] ?? g.metadata.termination_reason}
 							</span>
 						</div>
 						<div class="card-meta">
@@ -219,7 +219,7 @@
 				<div class="summary">
 					<div class="summary-row">
 						<span class="summary-label">{$i18n.hist_result}</span>
-						<span class="summary-val">{selected.metadata.termination_reason}</span>
+						<span class="summary-val">{($i18n as Record<string,string>)[selected.metadata.termination_reason] ?? selected.metadata.termination_reason}</span>
 					</div>
 					<div class="summary-row">
 					    <span class="summary-label">{$i18n.hist_time}</span>
@@ -261,10 +261,10 @@
 							<span class="log-san">{move.san}</span>
 
 							{#if GLYPH[move.category]}
-								<span class="log-glyph" style="color:{CATEGORY_COLOR[move.category]}">{GLYPH[move.category]}</span>
+								<span class="log-glyph" style="color:{(CATEGORY_COLOR as Record<string,string>)[move.category]}">{GLYPH[move.category]}</span>
 							{/if}
 
-							<span class="log-cat" style="color:{CATEGORY_COLOR[move.category]}">{move.category}</span>
+							<span class="log-cat" style="color:{(CATEGORY_COLOR as Record<string,string>)[move.category]}">{move.category}</span>
 
 							<span class="log-eval">{move.evalCp > 0 ? '+' : ''}{(move.evalCp / 100).toFixed(2)}</span>
 

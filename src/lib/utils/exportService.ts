@@ -2,10 +2,9 @@ import type { EvaluatedMove } from '$lib/types';
 
 export interface ExportMetadata {
 	session_id: string;
-	username: string;
 	match_number: number;
 	chess_type: string;
-	time_base: number;          
+	time_base: number;
 	time_increment_sec: number;
 	ai_skill_level: number;
 	timestamp: string;
@@ -26,5 +25,4 @@ export async function exportGame(
 	const result = await res.json();
 	if (!result.ok) throw new Error('Export failed');
 	return metadata.session_id; // return something useful instead
-	return file;
 }

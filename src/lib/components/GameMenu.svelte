@@ -20,9 +20,9 @@
 </script>
 
 <div class="menu-container">
-    <div class="config-section">
-        <label for="username" class="field-label">{$i18n.menu_username}</label>
-        <input type="text" id="username" bind:value={gameStore.sessionUsername} class="text-input" placeholder="Enter your username…" />
+    <div class="player-greeting">
+        <span class="greeting-icon">♟</span>
+        <span class="greeting-text">{$i18n.menu_playing_as} <strong>{gameStore.displayName}</strong></span>
     </div>
 
     <div class="config-section">
@@ -36,7 +36,7 @@
     </div>
 
     <div class="config-section">
-        <label class="field-label">{$i18n.menu_play_as}</label>
+        <div class="field-label">{$i18n.menu_play_as}</div>
         <div class="side-picker">
             <button class="side-btn" class:active={selectedSide === 'w'} onclick={() => selectedSide = 'w'}>{$i18n.menu_white}</button>
             <button class="side-btn" class:active={selectedSide === 'random'} onclick={() => selectedSide = 'random'}>{$i18n.menu_random}</button>
@@ -53,9 +53,9 @@
             				? $i18n.tc_custom
             				: tc.label}
             		</span>
-                
+
             		<span class="tc-type">
-            			{$i18n[`tc_${tc.type.toLowerCase()}`]}
+            			{($i18n as Record<string, string>)[`tc_${tc.type.toLowerCase()}`]}
             		</span>
             	</button>
             {/each}
@@ -87,14 +87,22 @@
         --c-accent: #629924; --c-accent-h: #508020;
     }
     .menu-container { background: var(--c-bg-2); border: 1px solid var(--c-border); border-radius: 6px; padding: 20px; }
+
+    .player-greeting {
+        display: flex; align-items: center; gap: 8px;
+        margin-bottom: 22px; padding-bottom: 18px;
+        border-bottom: 1px solid var(--c-border);
+        font-size: .88rem; color: var(--c-font-dim);
+    }
+    .greeting-icon { color: var(--c-accent); font-size: 1rem; }
+    .greeting-text strong { color: var(--c-font-top); }
+
     .config-section { margin-bottom: 22px; padding-bottom: 18px; border-bottom: 1px solid var(--c-border); }
     .field-label { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--c-font-dim); }
     .side-picker { display: flex; gap: 4px; background: var(--c-bg-3); padding: 4px; border-radius: 4px; }
     .side-btn { flex: 1; padding: 8px; background: transparent; border: none; border-radius: 3px; color: var(--c-font-dim); font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .1s; }
     .side-btn.active { background: var(--c-bg-2); color: var(--c-accent); box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
     .skill-value { color: var(--c-accent); font-weight: 700; text-transform: none; letter-spacing: 0; font-size: .88rem; }
-    .text-input { width: 100%; padding: 9px 12px; background: var(--c-bg-3); border: 1px solid var(--c-border); border-radius: 4px; color: var(--c-font-top); font-family: monospace; font-size: .95rem; box-sizing: border-box; outline: none; transition: border-color .15s; }
-    .text-input:focus { border-color: var(--c-accent); }
     .range-slider { width: 100%; cursor: pointer; accent-color: var(--c-accent); }
     .tc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
     .tc-btn { background: var(--c-bg-3); color: var(--c-font); border: 1px solid transparent; border-radius: 4px; padding: 14px 4px 10px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; box-shadow: 0 2px 0 rgba(0,0,0,.45); transition: background .12s, border-color .12s, color .12s; }

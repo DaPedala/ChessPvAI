@@ -3,8 +3,6 @@
     import { Chess } from 'chess.js';
     import { gameStore } from '$lib/stores/gameStore.svelte';
     import { getEngine } from '$lib/engineInstance';
-    import { get } from 'svelte/store';
-    import { i18n } from '$lib/stores/langStore';
 
     const engine = getEngine();
     let board: any;
@@ -75,7 +73,7 @@
             gameStore.startClock();
             gameStore.playerTime += gameStore.timeIncrement;
             gameStore.isPlayerTurn = false;
-            gameStore.statusText = get(i18n).status_evaluating;
+            gameStore.statusKey = 'status_evaluating';
             setTimeout(() => applyCheckHighlight(), 60);
             const rawEval = await engine.evaluatePositionAsync(gameStore.game.fen(), 8);
             gameStore.recordPlayerMove(move.san, rawEval);
@@ -131,7 +129,7 @@
                     gameStore.startClock();
                     gameStore.playerTime += gameStore.timeIncrement;
                     gameStore.isPlayerTurn = false;
-                    gameStore.statusText = 'Evaluating…';
+                    gameStore.statusKey = 'status_evaluating';
                     setTimeout(() => applyCheckHighlight(), 60);
                     const rawEval = await engine.evaluatePositionAsync(gameStore.game.fen(), 8);
                     gameStore.recordPlayerMove(move.san, rawEval);

@@ -2,9 +2,10 @@ import { json, error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import sql from '$lib/server/db';
 
-export const POST: RequestHandler = async ({ request }) => {
-	let body: unknown;
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (!locals.user) throw error(401, 'Not authenticated');
 
+	let body: unknown;
 	try {
 		body = await request.json();
 	} catch {
@@ -14,7 +15,6 @@ export const POST: RequestHandler = async ({ request }) => {
 	const { game, moves } = body as {
 		game: {
 			session_id:         string;
-			username:           string;
 			match_number:       number;
 			chess_type:         string;
 			time_base:          number;
@@ -39,12 +39,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 
 	try {
-		// Wrap both inserts in a transaction — either both succeed or neither does
 		await sql.begin(async (tx) => {
 			await tx`
 				INSERT INTO games (
 					session_id,
-					username,
+					user_id,
 					match_number,
 					chess_type,
 					time_base,
@@ -56,7 +55,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					played_at
 				) VALUES (
 					${game.session_id},
-					${game.username},
+					${locals.user!.id},
 					${game.match_number},
 					${game.chess_type},
 					${game.time_base},
@@ -93,45 +92,49 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 };
 
-export const GET: RequestHandler = async () => {
-    try {
-        const games = await sql`
-            SELECT * FROM games ORDER BY played_at DESC
-        `;
-        const result = await Promise.all(
-            games.map(async (game) => {
-                const moves = await sql`
-                    SELECT * FROM moves
-                    WHERE session_id = ${game.session_id}
-                    ORDER BY move_number ASC
-                `;
-                return {
-                    metadata: {
-                        session_id:         game.session_id,
-                        username:           game.username,
-                        match_number:       game.match_number,
-                        chess_type:         game.chess_type,
-                        time_base:          game.time_base,
-                        time_increment_sec: game.time_increment_sec,
-                        time_control:       game.time_control,
-                        ai_skill_level:     game.ai_skill_level,
-                        moves_count:        game.moves_count,
-                        termination_reason: game.termination_reason,
-                        timestamp:          game.played_at,
-                    },
-                    data: moves.map(m => ({
-                        san:      m.san,
-                        fen:      m.fen,
-                        category: m.category,
-                        value:    m.value,
-                        evalCp:   m.eval_cp,
-                    }))
-                };
-            })
-        );
-        return json(result);
-    } catch (e) {
-        console.error('[DB] Read failed:', e);
-        throw error(500, 'Database read failed');
-    }
+export const GET: RequestHandler = async ({ locals }) => {
+	if (!locals.user) throw error(401, 'Not authenticated');
+
+	try {
+		const games = await sql`
+			SELECT * FROM games
+			WHERE user_id = ${locals.user.id}
+			ORDER BY played_at DESC
+		`;
+		const result = await Promise.all(
+			games.map(async (game) => {
+				const moves = await sql`
+					SELECT * FROM moves
+					WHERE session_id = ${game.session_id}
+					ORDER BY move_number ASC
+				`;
+				return {
+					metadata: {
+						session_id:         game.session_id,
+						username:           locals.user!.display_name,
+						match_number:       game.match_number,
+						chess_type:         game.chess_type,
+						time_base:          game.time_base,
+						time_increment_sec: game.time_increment_sec,
+						time_control:       game.time_control,
+						ai_skill_level:     game.ai_skill_level,
+						moves_count:        game.moves_count,
+						termination_reason: game.termination_reason,
+						timestamp:          game.played_at,
+					},
+					data: moves.map(m => ({
+						san:      m.san,
+						fen:      m.fen,
+						category: m.category,
+						value:    m.value,
+						evalCp:   m.eval_cp,
+					}))
+				};
+			})
+		);
+		return json(result);
+	} catch (e) {
+		console.error('[DB] Read failed:', e);
+		throw error(500, 'Database read failed');
+	}
 };

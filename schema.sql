@@ -1,9 +1,27 @@
 -- Run this once against your database to set up the schema.
 -- psql -U youruser -d yourdb -f schema.sql
 
+CREATE TABLE IF NOT EXISTS users (
+    id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    email         TEXT        UNIQUE NOT NULL,
+    display_name  TEXT        UNIQUE NOT NULL,
+    password_hash TEXT        NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS sessions_user_idx    ON sessions(user_id);
+CREATE INDEX IF NOT EXISTS sessions_expires_idx ON sessions(expires_at);
+
 CREATE TABLE IF NOT EXISTS games (
     session_id          UUID        PRIMARY KEY,
-    username            TEXT        NOT NULL,
+    user_id             UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     match_number        INTEGER     NOT NULL,
     chess_type          TEXT        NOT NULL,
     time_base           INTEGER     NOT NULL,  -- seconds
@@ -18,15 +36,14 @@ CREATE TABLE IF NOT EXISTS games (
 CREATE TABLE IF NOT EXISTS moves (
     id           SERIAL      PRIMARY KEY,
     session_id   UUID        NOT NULL REFERENCES games(session_id) ON DELETE CASCADE,
-    move_number  INTEGER     NOT NULL,  -- 1-indexed position in the game
-    san          TEXT        NOT NULL,  -- standard algebraic notation e.g. "Nf3"
-    fen          TEXT        NOT NULL,  -- board state after the move
-    category     TEXT        NOT NULL,  -- best | excellent | good | inaccuracy | mistake | blunder
-    value        NUMERIC     NOT NULL,  -- numeric score for the category
-    eval_cp      INTEGER     NOT NULL   -- centipawn eval from white's perspective
+    move_number  INTEGER     NOT NULL,
+    san          TEXT        NOT NULL,
+    fen          TEXT        NOT NULL,
+    category     TEXT        NOT NULL,
+    value        NUMERIC     NOT NULL,
+    eval_cp      INTEGER     NOT NULL
 );
 
--- Handy indexes for common queries
-CREATE INDEX IF NOT EXISTS moves_session_idx ON moves(session_id);
-CREATE INDEX IF NOT EXISTS games_username_idx ON games(username);
+CREATE INDEX IF NOT EXISTS moves_session_idx  ON moves(session_id);
+CREATE INDEX IF NOT EXISTS games_user_idx     ON games(user_id);
 CREATE INDEX IF NOT EXISTS games_played_at_idx ON games(played_at DESC);

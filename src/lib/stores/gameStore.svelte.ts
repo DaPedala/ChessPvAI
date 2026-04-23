@@ -3,14 +3,7 @@ import type { GamePhase, EvaluatedMove, LastConfig, ChessColor } from '$lib/type
 import { categorizeMove } from '$lib/utils/moveCategories';
 import { exportGame } from '$lib/utils/exportService';
 
-import { get } from 'svelte/store';
-import { lang } from '$lib/stores/langStore';
 import { t } from '$lib/lang';
-
-// Helper to get current translation
-function tr(key: keyof typeof t.en): string {
-    return t[get(lang)][key];
-}
 
 function localISOString(): string {
 	const now = new Date();
@@ -26,20 +19,24 @@ function localISOString(): string {
 class GameStore {
 	game = new Chess();
 	currentPhase = $state<GamePhase>('MENU');
-	statusText = $state(tr('status_awaiting'));
+	statusKey = $state<keyof typeof t.en>('status_awaiting');
 	moveHistoryJSON = $state<EvaluatedMove[]>([]);
-	
+
 	// Always White-centric. Starts at ~20cp (White's opening advantage)
-	previousEval = $state(20); 
-	
+	previousEval = $state(20);
+
 	hasExported = $state(false);
 	selectedMoveIndex = $state<number | null>(null);
-	sessionUsername = $state('Player1');
+
+	// Set from the play page server load — identifies the logged-in user
+	displayName = $state('');
+	userId = $state('');
+
 	matchCounter = $state(1);
 	activeMatchNumber = $state(1);
 	activeChessType = $state('Unknown');
 	lastConfig = $state<LastConfig>({ base: 0, inc: 0, type: '' });
-	
+
 	playerTime = $state(0);
 	aiTime = $state(0);
 	timeIncrement = $state(0);
@@ -50,11 +47,6 @@ class GameStore {
 	private timerInterval: ReturnType<typeof setInterval> | null = null;
 
 	startGame(base: number, inc: number, type: string, color: ChessColor | 'random' = 'w') {
-		if (!this.sessionUsername.trim()) {
-			alert(tr('alert_username'));
-			return;
-		}
-
 		this.playerColor = color === 'random' ? (Math.random() > 0.5 ? 'w' : 'b') : color;
 		this.lastConfig = { base, inc, type };
 		this.activeMatchNumber = this.matchCounter;
@@ -64,8 +56,8 @@ class GameStore {
 		this.activeChessType = type;
 		this.currentPhase = 'PLAYING';
 		this.isPlayerTurn = (this.playerColor === 'w');
-		this.statusText = this.isPlayerTurn ? tr('status_your_turn') : tr('status_ai_thinking');
-		this.previousEval = 20; 
+		this.statusKey = this.isPlayerTurn ? 'status_your_turn' : 'status_ai_thinking';
+		this.previousEval = 20;
 	}
 
 	startClock() {
@@ -74,10 +66,10 @@ class GameStore {
 			if (this.currentPhase === 'TERMINATED') { this.stopClock(); return; }
 			if (this.isPlayerTurn) {
 				this.playerTime--;
-				if (this.playerTime <= 0) this.handleTermination(tr('status_timeout_ai'));
+				if (this.playerTime <= 0) this.handleTermination('status_timeout_ai');
 			} else {
 				this.aiTime--;
-				if (this.aiTime <= 0) this.handleTermination(tr('status_timeout_player'));
+				if (this.aiTime <= 0) this.handleTermination('status_timeout_player');
 			}
 		}, 1000);
 	}
@@ -89,8 +81,8 @@ class GameStore {
 		}
 	}
 
-	handleTermination(reason: string) {
-		this.statusText = reason;
+	handleTermination(key: keyof typeof t.en) {
+		this.statusKey = key;
 		this.currentPhase = 'TERMINATED';
 		this.stopClock();
 		this.triggerAutoExport();
@@ -98,16 +90,16 @@ class GameStore {
 
 	updateStatus() {
 		if (this.game.isGameOver()) {
-			if (this.game.isCheckmate()) this.handleTermination(tr('status_checkmate'));
-			else if (this.game.isDraw()) this.handleTermination(tr('status_draw'));
-			else this.handleTermination(tr('status_game_over'));
+			if (this.game.isCheckmate()) this.handleTermination('status_checkmate');
+			else if (this.game.isDraw()) this.handleTermination('status_draw');
+			else this.handleTermination('status_game_over');
 		} else {
-			this.statusText = this.isPlayerTurn ? tr('status_your_turn') : tr('status_ai_thinking');
+			this.statusKey = this.isPlayerTurn ? 'status_your_turn' : 'status_ai_thinking';
 		}
 	}
 
 	recordPlayerMove(san: string, currentEvalWhite: number) {
-		// Since .move() was already called on the chess object, 
+		// Since .move() was already called on the chess object,
 		// the color who JUST moved is the opposite of the current turn.
 		const movedColor = this.game.turn() === 'w' ? 'b' : 'w';
 
@@ -150,7 +142,6 @@ class GameStore {
 			await exportGame(
 				{
 					session_id: crypto.randomUUID(),
-					username: this.sessionUsername.trim(),
 					match_number: this.activeMatchNumber,
 					chess_type: this.activeChessType,
 					time_base: this.lastConfig.base,
@@ -158,7 +149,7 @@ class GameStore {
 					ai_skill_level: this.aiSkillLevel,
 					timestamp: localISOString(),
 					moves_count: this.moveHistoryJSON.length,
-					termination_reason: this.statusText,
+					termination_reason: this.statusKey,
 					time_control: `${this.lastConfig.base/60}+${this.lastConfig.inc}`
 				},
 				this.moveHistoryJSON
@@ -189,7 +180,7 @@ class GameStore {
 	goToMenu() {
 		this.clearBoardState();
 		this.currentPhase = 'MENU';
-		this.statusText = tr('status_awaiting');
+		this.statusKey = 'status_awaiting';
 	}
 }
 
