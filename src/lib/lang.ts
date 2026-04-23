@@ -19,7 +19,7 @@ export const t = {
         hero_title_1:  'Chess,',
         hero_title_2:  'the way it',
         hero_title_3:  'should be.',
-        hero_sub:      'Play against a world-class engine. Get immediate move-by-move feedback. Every game logged. No accounts, no fuss.',
+        hero_sub:      'Play against a world-class engine. Get immediate move-by-move feedback. Every game saved to your account — your history, always waiting.',
         hero_btn_play: 'Start playing',
         hero_btn_feat: 'See features ↓',
 
@@ -40,7 +40,7 @@ export const t = {
 
         // Steps
         step_1_title: 'Configure',
-        step_1_desc:  'Set your username, pick a time control, choose your side and AI difficulty.',
+        step_1_desc:  'Log in to your account, pick a time control, choose your side and AI difficulty.',
         step_2_title: 'Play',
         step_2_desc:  'Click or drag pieces on the board. The clock starts on your first move.',
         step_3_title: 'Review',
@@ -48,8 +48,8 @@ export const t = {
 
         // About
         about_quote: 'Chess is not about the destination — it\'s about the moves you understand along the way.',
-        about_p1:    'ChessApp is a passion project built on top of <strong>Stockfish 18</strong>, the strongest open-source chess engine in existence, and <strong>chess.js</strong> for move validation. The interface is written in <strong>SvelteKit</strong> with a focus on feel — responsive controls, real-time evaluation, and a clean post-game review.',
-        about_p2:    'No servers required for gameplay. Everything runs in your browser. Your moves are yours.',
+        about_p1:    'ChessPvAI is a passion project built on top of <strong>Stockfish 18</strong>, the strongest open-source chess engine in existence, and <strong>chess.js</strong> for move validation. The interface is written in <strong>SvelteKit</strong> with a focus on feel — responsive controls, real-time evaluation, and a clean post-game review.',
+        about_p2:    'Your account keeps every game. Come back any time to review your matches, track your improvement, and compete on the leaderboard.',
         about_btn:   'Open the board →',
 
         // Section headers
@@ -94,7 +94,6 @@ export const t = {
         language: 'Language',
 
         // GameMenu
-        menu_username:     'Username',
         menu_ai_strength:  'AI Strength',
         menu_maximum:      'Maximum',
         menu_beginner:     'Beginner',
@@ -194,7 +193,7 @@ export const t = {
         hero_title_1:  'Șah,',
         hero_title_2:  'așa cum ar',
         hero_title_3:  'trebui să fie.',
-        hero_sub:      'Joacă împotriva unui motor de șah de top mondial. Primești feedback imediat pentru fiecare mutare. Fiecare partidă este salvată. Fără conturi, fără bătăi de cap.',
+        hero_sub:      'Joacă împotriva unui motor de șah de top mondial. Primești feedback imediat pentru fiecare mutare. Fiecare partidă salvată în contul tău — progresul tău, mereu la îndemână.',
         hero_btn_play: 'Începe să joci',
         hero_btn_feat: 'Vezi funcțiile ↓',
 
@@ -215,7 +214,7 @@ export const t = {
 
         // Steps
         step_1_title: 'Configurează',
-        step_1_desc:  'Setează-ți numele de utilizator, alege un control de timp, partea și dificultatea AI.',
+        step_1_desc:  'Autentifică-te în cont, alege un control de timp, partea și dificultatea AI.',
         step_2_title: 'Joacă',
         step_2_desc:  'Apasă sau trage piesele pe tablă. Ceasul pornește la prima mutare.',
         step_3_title: 'Analizează',
@@ -223,8 +222,8 @@ export const t = {
 
         // About
         about_quote: 'Șahul nu este despre destinație — ci despre mutările pe care le înțelegi pe drum.',
-        about_p1:    'ChessApp este un proiect de suflet construit pe <strong>Stockfish 18</strong>, cel mai puternic motor de șah open-source, și <strong>chess.js</strong> pentru validarea mutărilor. Interfața este scrisă în <strong>SvelteKit</strong> cu accent pe experiență — controale responsive, evaluare în timp real și o revizuire clară după partidă.',
-        about_p2:    'Nu sunt necesare servere pentru joc. Totul rulează în browserul tău. Mutările tale îți aparțin.',
+        about_p1:    'ChessPvAI este un proiect de suflet construit pe <strong>Stockfish 18</strong>, cel mai puternic motor de șah open-source, și <strong>chess.js</strong> pentru validarea mutărilor. Interfața este scrisă în <strong>SvelteKit</strong> cu accent pe experiență — controale responsive, evaluare în timp real și o revizuire clară după partidă.',
+        about_p2:    'Contul tău păstrează fiecare partidă. Revino oricând să îți revizuiești meciurile, să urmărești progresul și să concurezi în clasament.',
         about_btn:   'Deschide tabla →',
 
         // Section headers
@@ -269,7 +268,6 @@ export const t = {
         language: 'Limbă',
 
         // GameMenu
-        menu_username:     'Nume utilizator',
         menu_ai_strength:  'Putere AI',
         menu_maximum:      'Maxim',
         menu_beginner:     'Începător',
