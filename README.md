@@ -26,6 +26,7 @@ cd ChessPvAI
 
 ```bash
 npm install
+npm install bcryptjs
 ```
 
 ---
@@ -140,6 +141,7 @@ cd ChessPvAI
 
 ```bash
 npm install
+npm install bcryptjs
 ```
 
 ---
