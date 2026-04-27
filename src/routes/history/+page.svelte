@@ -32,6 +32,18 @@
 		best: '!', excellent: '!', good: '', inaccuracy: '?!', mistake: '?', blunder: '??',
 	};
 
+	// Normalize legacy English display strings to i18n keys
+	const LEGACY_KEYS: Record<string, string> = {
+		'Timeout: AI Wins':     'status_timeout_ai',
+		'Timeout: Player Wins': 'status_timeout_player',
+		'Checkmate!':           'status_checkmate',
+		'Draw!':                'status_draw',
+		'Game Over':            'status_game_over',
+	};
+	function normKey(reason: string): string {
+		return LEGACY_KEYS[reason] ?? reason;
+	}
+
 	// ── State ─────────────────────────────────────────────────────────────────
 	let games        = $state<Game[]>([]);
 	let selected     = $state<Game | null>(null);
@@ -44,14 +56,14 @@
 		if (!moves.length) return 0;
 		let total = 0;
 		for (let i = 0; i < moves.length; i++) {
-			const prev = i === 0 ? 0 : moves[i - 1].evalCp;
+			const prev = i === 0 ? 20 : moves[i - 1].evalCp;
 			total += Math.max(0, prev - moves[i].evalCp);
 		}
 		return Math.round(total / moves.length);
 	}
 
 	function cplOf(moves: Move[], i: number): number {
-		const prev = i === 0 ? 0 : moves[i - 1].evalCp;
+		const prev = i === 0 ? 20 : moves[i - 1].evalCp;
 		return Math.max(0, prev - moves[i].evalCp);
 	}
 
@@ -147,7 +159,7 @@
 	</div>
 
 	{#if loading}
-		<p class="empty">$i18n.hist_loading</p>
+		<p class="empty">{$i18n.hist_loading}</p>
 
 	{:else if !selected}
 		<!-- ── Game list ──────────────────────────────────────────────────── -->
@@ -161,8 +173,8 @@
 						<div class="card-top">
 							<span class="card-user">{g.metadata.username}</span>
 							<span class="card-match">Match #{g.metadata.match_number}</span>
-							<span class="card-result" class:win={g.metadata.termination_reason === 'status_timeout_player'} class:loss={g.metadata.termination_reason === 'status_timeout_ai' || g.metadata.termination_reason === 'status_checkmate'}>
-								{($i18n as Record<string,string>)[g.metadata.termination_reason] ?? g.metadata.termination_reason}
+							<span class="card-result" class:win={normKey(g.metadata.termination_reason) === 'status_timeout_player' || normKey(g.metadata.termination_reason) === 'status_checkmate_player'} class:loss={normKey(g.metadata.termination_reason) === 'status_timeout_ai' || normKey(g.metadata.termination_reason) === 'status_checkmate_ai' || normKey(g.metadata.termination_reason) === 'status_checkmate'}>
+								{($i18n as Record<string,string>)[normKey(g.metadata.termination_reason)] ?? g.metadata.termination_reason}
 							</span>
 						</div>
 						<div class="card-meta">
@@ -219,7 +231,7 @@
 				<div class="summary">
 					<div class="summary-row">
 						<span class="summary-label">{$i18n.hist_result}</span>
-						<span class="summary-val">{($i18n as Record<string,string>)[selected.metadata.termination_reason] ?? selected.metadata.termination_reason}</span>
+						<span class="summary-val">{($i18n as Record<string,string>)[normKey(selected.metadata.termination_reason)] ?? selected.metadata.termination_reason}</span>
 					</div>
 					<div class="summary-row">
 					    <span class="summary-label">{$i18n.hist_time}</span>

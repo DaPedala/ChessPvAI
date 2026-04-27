@@ -90,8 +90,11 @@ class GameStore {
 
 	updateStatus() {
 		if (this.game.isGameOver()) {
-			if (this.game.isCheckmate()) this.handleTermination('status_checkmate');
-			else if (this.game.isDraw()) this.handleTermination('status_draw');
+			if (this.game.isCheckmate()) {
+				// game.turn() is the side that is IN checkmate (cannot move)
+				const playerMated = this.game.turn() === this.playerColor;
+				this.handleTermination(playerMated ? 'status_checkmate_ai' : 'status_checkmate_player');
+			} else if (this.game.isDraw()) this.handleTermination('status_draw');
 			else this.handleTermination('status_game_over');
 		} else {
 			this.statusKey = this.isPlayerTurn ? 'status_your_turn' : 'status_ai_thinking';

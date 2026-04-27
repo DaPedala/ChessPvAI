@@ -35,6 +35,12 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400;1,700&family=IBM+Plex+Mono:wght@400;500;700&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
 </svelte:head>
 
+<div class="mobile-block">
+    <span class="mobile-icon">♔</span>
+    <h1>Desktop Only</h1>
+    <p>ChessPvAI is designed for desktop browsers. Please open this site on a computer to play.</p>
+</div>
+
 <header class="nav">
     <a href="/" class="nav-logo">
         <span class="logo-icon">♔</span>
@@ -213,5 +219,35 @@
 
     @media (max-width: 900px) {
         .nav-links { display: none; }
+    }
+
+    .mobile-block {
+        display: none;
+        position: fixed; inset: 0; z-index: 9999;
+        background: var(--bg);
+        flex-direction: column; align-items: center; justify-content: center;
+        gap: 20px;
+        padding: 32px;
+        text-align: center;
+    }
+    .mobile-icon {
+        font-size: 3rem;
+        color: var(--accent);
+    }
+    .mobile-block h1 {
+        font-family: var(--serif);
+        font-size: 1.8rem;
+        color: var(--text-top);
+    }
+    .mobile-block p {
+        font-family: var(--sans);
+        font-size: 1rem;
+        color: var(--text-dim);
+        max-width: 300px;
+        line-height: 1.6;
+    }
+
+    @media (hover: none) and (pointer: coarse) {
+        .mobile-block { display: flex; }
     }
 </style>

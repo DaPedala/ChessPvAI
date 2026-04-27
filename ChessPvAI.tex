@@ -1,0 +1,640 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[romanian]{babel}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{needspace}
+
+\geometry{margin=2.5cm}
+
+% --- Code listing style ---
+\definecolor{codebg}{RGB}{245,245,245}
+\definecolor{codeframe}{RGB}{200,200,200}
+\definecolor{codecomment}{RGB}{100,100,100}
+\definecolor{codestring}{RGB}{163,21,21}
+\definecolor{codekeyword}{RGB}{0,0,255}
+
+\lstset{
+  backgroundcolor=\color{codebg},
+  frame=single,
+  rulecolor=\color{codeframe},
+  basicstyle=\ttfamily\small,
+  keywordstyle=\color{codekeyword}\bfseries,
+  stringstyle=\color{codestring},
+  commentstyle=\color{codecomment}\itshape,
+  breaklines=true,
+  captionpos=b,
+  numbers=none,
+  showstringspaces=false,
+  tabsize=2,
+}
+
+% --- Title ---
+\title{\textbf{Arhitectura sistemului de șah ChessPvAI}}
+\date{}
+\author{}
+
+\fancypagestyle{firstpage}{
+  \fancyhf{}
+  \renewcommand{\headrulewidth}{0pt}
+}
+
+\begin{document}
+
+\maketitle
+\thispagestyle{firstpage}
+\tableofcontents
+\newpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Structura proiectului}
+
+Organizarea fișierelor reflectă o arhitectură modernă bazată pe SvelteKit, separând clar interfața de logica de joc și de motorul de analiză Stockfish. Directorul \texttt{src/lib} conține componentele reutilizabile, stările globale și utilitarele, iar \texttt{src/routes} definește paginile și API-urile. Autentificarea și persistența datelor sunt gestionate exclusiv pe server, prin hook-urile SvelteKit și un cluster PostgreSQL local.
+
+\begin{verbatim}
+ChessPvAI/
++-- package.json          (dependente NPM si scripturi)
++-- schema.sql            (structura tabelelor PostgreSQL)
++-- src/
+|   +-- app.d.ts          (definitii TypeScript globale)
+|   +-- app.html          (sablon HTML principal)
+|   +-- hooks.server.ts   (interceptor sesiuni la nivel de ruta)
+|   +-- lib/
+|   |   +-- assets/
+|   |   |   '-- favicon.svg
+|   |   +-- components/
+|   |   |   +-- GameBoard.svelte    (tabla interactiva)
+|   |   |   +-- GameClock.svelte    (afisare ceas)
+|   |   |   +-- GameMenu.svelte     (meniu configurare)
+|   |   |   +-- MoveLog.svelte      (jurnal mutari)
+|   |   |   '-- PostGame.svelte     (butoane rematch/new game)
+|   |   +-- server/
+|   |   |   +-- auth.ts             (hashing, sesiuni)
+|   |   |   '-- db.ts               (conexiune PostgreSQL)
+|   |   +-- stores/
+|   |   |   +-- gameStore.svelte.ts (stare globala joc)
+|   |   |   '-- langStore.ts        (stare limba)
+|   |   +-- constants.ts            (controale de timp predefinite)
+|   |   +-- engine.ts               (wrapper Web Worker Stockfish)
+|   |   +-- engineInstance.ts       (singleton motor)
+|   |   +-- lang.ts                 (traduceri EN/RO)
+|   |   +-- types.ts                (tipuri TypeScript partajate)
+|   |   '-- utils/
+|   |       +-- exportService.ts    (client API export)
+|   |       +-- moveCategories.ts   (clasificare CPL)
+|   |       '-- timeFormat.ts       (formatare mm:ss)
+|   '-- routes/
+|       +-- +layout.server.ts       (date utilizator pentru layout)
+|       +-- +layout.svelte          (navbar, footer, limba)
+|       +-- +page.svelte            (pagina principala)
+|       +-- api/
+|       |   +-- export/
+|       |   |   '-- +server.ts      (POST/GET partide)
+|       |   '-- leaderboard/
+|       |       '-- +server.ts      (GET clasament)
+|       +-- auth/
+|       |   +-- login/
+|       |   |   +-- +page.server.ts
+|       |   |   '-- +page.svelte
+|       |   +-- register/
+|       |   |   +-- +page.server.ts
+|       |   |   '-- +page.svelte
+|       |   '-- logout/
+|       |       '-- +page.server.ts
+|       +-- account/
+|       |   +-- +page.server.ts
+|       |   '-- +page.svelte
+|       +-- history/
+|       |   +-- +page.server.ts
+|       |   '-- +page.svelte
+|       +-- leaderboard/
+|       |   +-- +page.server.ts
+|       |   '-- +page.svelte
+|       '-- play/
+|           +-- +page.server.ts
+|           '-- +page.svelte
++-- static/
+|   +-- img/chesspieces/wikipedia/  (12 sprite-uri PNG)
+|   +-- robots.txt
+|   '-- stockfish.js                (motor Stockfish WASM)
++-- svelte.config.js
++-- tsconfig.json
+'-- vite.config.ts
+\end{verbatim}
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Prezentarea interfeței utilizator}
+
+Aplicația ChessPvAI este structurată în șase zone vizuale distincte, accesibile prin bara de navigare globală. Fiecare zonă a fost proiectată cu un scop clar, urmând un flux natural: prezentare → autentificare → configurare → joc → revizuire → clasament. Întreaga interfață este concepută exclusiv pentru utilizare pe desktop; pe dispozitivele mobile, un ecran de blocare informează utilizatorul că aplicația nu este disponibilă pe ecrane tactile.
+
+\subsection{Layout-ul comun: bara de navigare și footer-ul}
+
+Toate paginile aplicației partajează un layout comun definit în \texttt{+layout.svelte}. Bara de navigare fixă ocupă permanent partea superioară a ecranului și conține mai multe elemente:
+\begin{itemize}
+  \item \textbf{Logo-ul aplicației} (\texttt{♔ CHESSPvAI}), care funcționează și ca link spre pagina principală.
+  \item \textbf{Linkuri de navigare} spre secțiunile paginii principale (Features, How it works, About), spre istoricul partidelor și spre clasament. Acestea sunt ascunse în paginile de joc și autentificare pentru a nu distrage atenția utilizatorului.
+  \item \textbf{Selectorul de limbă} — un dropdown compact pentru comutarea între engleză și română, persistent pe toată durata sesiunii prin \texttt{localStorage}.
+  \item \textbf{Zona de autentificare} — afișează butoanele \textit{Log in} și \textit{Sign up} pentru vizitatorii neautentificați sau, pentru utilizatorii autentificați, numele de afișat (cu link spre setările contului), butonul \textit{Log out} și butonul de acces rapid la pagina de joc.
+\end{itemize}
+
+Footer-ul afișează logo-ul, atribuirile tehnologice și un link spre depozitul GitHub al proiectului.
+
+\subsection{Pagina principală (\texttt{/})}
+
+Pagina principală servește drept punct de intrare și prezentare a aplicației. Este organizată în patru secțiuni:
+
+\paragraph{Hero.}
+O zonă centrală de impact vizual cu un fundal care simulează o tablă de șah (grilă 8×8 cu celule alternante), animație de apariție la încărcare și un titlu stilizat cu font serif. Două butoane de acțiune direcționează utilizatorul spre pagina de joc sau spre secțiunea de funcționalități.
+
+\paragraph{Statistici animate.}
+Un rând de trei carduri afișează valori numerice relevante: ratingul Stockfish (3500+), numărul de controale de timp disponibile (12) și numărul de categorii de mutări (6). Valorile pornesc de la zero și cresc progresiv printr-o animație declanșată de \texttt{IntersectionObserver} în momentul în care secțiunea devine vizibilă în viewport.
+
+\paragraph{Funcționalități și pași.}
+Patru carduri descriu funcționalitățile principale ale aplicației: motorul Stockfish, analiza mutărilor, controalele de timp și exportul automat al partidelor. Urmează o secțiune \textit{How it works} cu trei pași numerotați (Configure → Play → Review), ilustrând fluxul unei sesiuni complete de joc.
+
+\paragraph{Secțiunea About.}
+Un citat introductiv, o descriere sumară a tehnologiilor utilizate (Stockfish, chess.js, SvelteKit) și un buton final de acces la tablă.
+
+\subsection{Autentificarea utilizatorilor}
+
+Aplicația folosește un sistem propriu de autentificare bazat pe sesiuni (cookie \texttt{httpOnly}, TTL 30 de zile), fără dependențe externe de tip OAuth. Există trei rute dedicate, grupate sub prefixul \texttt{/auth/}.
+
+\paragraph{Înregistrare (\texttt{/auth/register}).}
+Un formular cu patru câmpuri: adresă de email, nume de afișat, parolă și confirmarea parolei. La trimitere, serverul validează unicitatea email-ului și a numelui de afișat, calculează hash-ul bcrypt al parolei, creează utilizatorul și sesiunea, și redirecționează spre \texttt{/play}. Erorile de validare (email deja înregistrat, parole care nu coincid) sunt afișate direct sub câmpul corespunzător. Un link spre pagina de autentificare este disponibil pentru utilizatorii care au deja cont.
+
+\paragraph{Autentificare (\texttt{/auth/login}).}
+Un formular cu câmpurile email și parolă. La trimitere, serverul verifică hash-ul bcrypt și creează o sesiune nouă. Un mesaj de eroare generic este afișat în caz de eșec, fără a dezvălui dacă adresa de email există în sistem sau nu. Pagina redirecționează automat spre \texttt{/play} dacă utilizatorul este deja autentificat.
+
+\paragraph{Deconectare (\texttt{/auth/logout}).}
+Acționată printr-un buton de tip \texttt{<form method="POST">} din bara de navigare. Serverul șterge sesiunea din baza de date și cookie-ul asociat, redirecționând utilizatorul spre pagina principală.
+
+Rutele protejate (\texttt{/play}, \texttt{/history}, \texttt{/account}) redirecționează automat spre \texttt{/auth/login} dacă sesiunea lipsește sau a expirat.
+
+\subsection{Pagina contului (\texttt{/account})}
+
+Utilizatorul autentificat poate modifica două lucruri din această pagină, prin formulare independente:
+
+\begin{itemize}
+  \item \textbf{Numele de afișat} — câmp text cu validare de unicitate pe server. Numele actualizat se reflectă imediat în bara de navigare și va fi asociat tuturor partidelor viitoare.
+  \item \textbf{Parola} — trei câmpuri: parola curentă (verificată cu bcrypt înainte de orice modificare), parola nouă și confirmarea acesteia.
+\end{itemize}
+
+Fiecare formular afișează un mesaj de confirmare sau de eroare imediat după trimitere.
+
+\subsection{Interfața de joc (\texttt{/play})}
+
+Pagina de joc este zona centrală a aplicației și combină mai multe componente vizuale. Layout-ul este împărțit în două coloane:
+\begin{itemize}
+  \item \textbf{Coloana stângă}: tabla de șah și ceasul, plasate vertical.
+  \item \textbf{Coloana dreaptă}: meniul de configurare înainte de start, înlocuit de jurnalul mutărilor și panoul post-partidă după terminarea jocului.
+\end{itemize}
+O bară de stare plasată deasupra tablei afișează mesajul curent al jocului (rândul tău / motorul se gândește / evaluare / rezultat) și un badge \textit{Saved} verde care apare automat după salvarea partidei în baza de date.
+
+\paragraph{Meniu de configurare (GameMenu).}
+Primul ecran afișat la intrarea pe \texttt{/play}. Conține:
+\begin{itemize}
+  \item un slider de dificultate AI cu etichetele Beginner și Maximum la capete (valori 0–20);
+  \item un selector de culoare a pieselor cu trei opțiuni: Alb, Aleatoriu, Negru;
+  \item douăsprezece butoane de control al timpului grupate pe categorii (Bullet, Blitz, Rapid, Classical) și un buton Custom care deschide un subformular cu câmpuri pentru minute și increment Fischer;
+  \item butonul \textit{Start game} care inițializează partida.
+\end{itemize}
+
+\paragraph{Tabla de șah (GameBoard).}
+O tablă de 450px, orientată în funcție de culoarea aleasă de jucător. Mutările se fac prin drag \& drop sau prin click (selectare piesă → click destinație). Pătratele destinație legale sunt marcate cu buline verzi pentru mutări simple și cu cercuri roșii pentru capturi. Regele aflat în șah primește un fundal radial roșu. Pe durata navigării prin istoricul mutărilor unui joc în curs, tabla este înconjurată de o bordură aurie pentru a semnaliza că poziția afișată nu este cea curentă.
+
+\paragraph{Ceasul (GameClock).}
+Două blocuri de timp — unul pentru jucător, unul pentru motor — în formatul \texttt{M:SS}. Blocul activ este evidențiat vizual. Ceasul pornește la prima mutare a jucătorului, include incrementul Fischer după fiecare mutare și se oprește la finalul partidei sau în timpul navigării prin istoric.
+
+\paragraph{Jurnalul mutărilor (MoveLog).}
+O listă derulabilă a tuturor mutărilor jucătorului, cu notație SAN, glife de calitate (\texttt{!}, \texttt{?!}, \texttt{?}, \texttt{??}), categoria colorată și evaluarea în centipawni. Butoanele ‹ / › permit navigarea cronologică, redând pe tablă poziția corespunzătoare fiecărei mutări. Butonul \textit{↩ Live} readuce vizualizarea la poziția curentă a jocului.
+
+\paragraph{Panoul post-partidă (PostGame).}
+Afișat după terminarea jocului, oferă două opțiuni: \textit{Rematch} — inversează culorile și repornește cu aceleași setări — și \textit{New game} — revine la meniul de configurare.
+
+\subsection{Istoricul partidelor (\texttt{/history})}
+
+Pagina de istoric, accesibilă doar utilizatorilor autentificați, afișează toate partidele salvate ale utilizatorului curent, ordonate descrescător după dată.
+
+\paragraph{Lista de partide.}
+Fiecare partidă este reprezentată printr-un card care prezintă:
+\begin{itemize}
+  \item numele utilizatorului, numărul meciului și rezultatul — colorat în verde pentru victorie, roșu pentru înfrângere și neutru pentru remiză;
+  \item tipul de șah (Bullet, Blitz, Rapid, Classical), controlul de timp în format \texttt{M+S}, nivelul AI și numărul de mutări;
+  \item CPL mediu al jucătorului, colorat în funcție de performanță: verde sub 60, galben între 60 și 150, roșu peste 150;
+  \item marca temporală a jocului.
+\end{itemize}
+
+\paragraph{Modul de review.}
+La selectarea unui card, pagina trece în modul de analiză. O tablă de șah separată, în regim de citire, redă pozițiile istorice. Alături de tablă, un jurnal listează fiecare mutare cu notația SAN, categoria, evaluarea în centipawni și pierderea CPL specifică acelei mutări. Butoanele ‹ / › permit parcurgerea secvențială a mutărilor, iar un panou sumar afișează rezultatul, controlul de timp, CPL mediu și data jocului. Butonul ← readuce utilizatorul la lista de partide.
+
+\subsection{Clasamentul (\texttt{/leaderboard})}
+
+Pagina de clasament prezintă un tabel cu toți utilizatorii care au cel puțin o partidă înregistrată, ordonați descrescător după rata de victorii. Coloanele tabelului sunt:
+\begin{itemize}
+  \item \textbf{Rank} — numărul de ordine, cu medalii pentru primele trei locuri;
+  \item \textbf{Player} — numele de afișat al utilizatorului;
+  \item \textbf{Games} — numărul total de partide jucate;
+  \item \textbf{Wins} — numărul de victorii;
+  \item \textbf{Win Rate} — procentul de victorii, afișat numeric și printr-o bară orizontală verde proporțională;
+  \item \textbf{Avg Moves} — media numărului de mutări per partidă;
+  \item \textbf{Skill Range} — intervalul minim–maxim al dificultății AI folosite de acel jucător.
+\end{itemize}
+La rate de victorii egale, jucătorul cu mai multe partide jucate este clasat mai sus. Datele sunt reîncărcate la fiecare montare a componentei.
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Implementarea componentelor Svelte}
+
+Interfața vizuală este construită în Svelte 5, folosind sistemul de rune (\texttt{\$state}, \texttt{\$derived}, \texttt{\$effect}) pentru reactivitate granulară. Fiecare componentă are un singur punct de responsabilitate și comunică cu restul aplicației prin store-ul global de joc.
+
+\subsection{\texttt{app.html} și \texttt{+layout.svelte}}
+
+Fișierul \texttt{app.html} definește scheletul HTML și încarcă bibliotecile externe necesare redării tablei: jQuery și ChessboardJS. Acestea sunt adăugate ca scripturi globale deoarece ChessboardJS nu oferă un modul ESM compatibil cu bundlerele moderne. Toate fonturile (Playfair Display, IBM Plex Mono, IBM Plex Sans) sunt preîncărcate via Google Fonts pentru a evita FOUT (\textit{Flash of Unstyled Text}).
+
+\texttt{+layout.svelte} primește datele utilizatorului de la \texttt{+layout.server.ts}, construiește dinamic lista de linkuri de navigare în funcție de ruta curentă și expune selectorul de limbă. Stilurile globale — paleta de culori, tipografia, reset-ul CSS — sunt definite tot aici prin blocuri \texttt{:global()}.
+
+\subsection{Internaționalizarea — \texttt{lang.ts} și \texttt{langStore.ts}}
+
+Toate textele vizibile din interfață sunt definite în \texttt{lang.ts} ca obiecte indexate pe cod de limbă (\texttt{en} / \texttt{ro}). Fiecare cheie este strict tipizată: TypeScript semnalează la compilare orice cheie lipsă dintr-una dintre limbi, prevenind traducerile incomplete.
+
+Store-ul \texttt{langStore.ts} expune un store Svelte care citește preferința din \texttt{localStorage} la inițializare și o persistă la orice modificare. Componenta \texttt{\$i18n} este un store derivat care întoarce întotdeauna obiectul de traduceri corespunzător limbii active, astfel că orice schimbare de limbă se reflectă instantaneu în toată interfața fără reîncărcare de pagină.
+
+\subsection{Starea globală a jocului — \texttt{gameStore.svelte.ts}}
+
+Clasa \texttt{GameStore} centralizează întreaga stare a unei partide folosind runele Svelte 5:
+\begin{itemize}
+  \item instanța \texttt{Chess} din \texttt{chess.js}, responsabilă de validarea mutărilor și detectarea finalului de joc;
+  \item istoricul mutărilor (\texttt{moveHistoryJSON}) cu evaluări centipawn per mutare;
+  \item faza jocului: \texttt{MENU}, \texttt{PLAYING} sau \texttt{TERMINATED};
+  \item timpii rămași, incrementul, tura curentă și culoarea jucătorului;
+  \item nivelul de abilitate Stockfish (0–20).
+\end{itemize}
+
+Metodele cheie ale store-ului sunt:
+\begin{itemize}
+  \item \texttt{startGame()} — inițializează o partidă nouă, resetează ceasurile și setează culoarea jucătorului.
+  \item \texttt{recordPlayerMove()} — primește notația SAN și evaluarea centipawn curentă, calculează pierderea CPL față de evaluarea anterioară și stochează mutarea cu categoria corespunzătoare.
+  \item \texttt{updateStatus()} — verifică după fiecare mutare dacă jocul s-a încheiat, determinând și cine a livrat șahul mat.
+  \item \texttt{triggerAutoExport()} — trimite automat datele partidei la \texttt{/api/export} la finalizare.
+  \item \texttt{selectMove()} — permite navigarea prin istoricul de mutări, oprind ceasul pe durata replay-ului.
+\end{itemize}
+
+\subsection{Tabla de șah — \texttt{GameBoard.svelte}}
+
+Componenta folosește biblioteca \texttt{chessboardjs} încărcată global. În \texttt{onMount} se creează instanța tablei cu opțiunile corespunzătoare:
+\begin{itemize}
+  \item \texttt{draggable: true} — permite mutarea pieselor prin tragere;
+  \item \texttt{orientation} — alb sau negru, în funcție de \texttt{playerColor};
+  \item \texttt{pieceTheme} — calea spre imaginile PNG din \texttt{/static/img/};
+  \item callback-urile \texttt{onDragStart}, \texttt{onDrop} și \texttt{onSnapEnd}.
+\end{itemize}
+
+Deoarece ChessboardJS nu oferă un modul ESM, constructorul \texttt{Chessboard} este accesat prin \texttt{(window as any)} pentru a ocoli verificările TypeScript:
+
+\begin{lstlisting}[language=Java, caption={Instanțierea tablei în GameBoard.svelte}]
+onMount(() => {
+  board = (window as any).Chessboard('board', {
+    draggable: true,
+    position: 'start',
+    pieceTheme: '/img/chesspieces/wikipedia/{piece}.png',
+    onDrop: handleMove
+  });
+});
+\end{lstlisting}
+
+Pe lângă drag \& drop, componenta implementează un sistem de click pe pătrate: la selectarea unei piese proprii sunt evidențiate destinațiile legale cu buline verzi (mutări) sau cercuri roșii (capturi), prin adăugarea dinamică a claselor CSS \texttt{.hl-move}, \texttt{.hl-capture}, \texttt{.hl-selected} și \texttt{.hl-check}.
+
+Un bloc \texttt{\$effect} monitorizează \texttt{gameStore.displayFen} și sincronizează automat poziția vizuală a tablei cu starea logică a jocului, acoperind atât mutările în timp real, cât și navigarea în replay.
+
+\subsection{Meniu de configurare — \texttt{GameMenu.svelte}}
+
+Gestionează inputurile utilizatorului înainte de start: slider de dificultate, selector de culoare și butoanele de control al timpului. La apăsarea butonului „Start game" validează că utilizatorul are un nume de afișat setat, apoi apelează \texttt{gameStore.startGame()}.
+
+\subsection{Ceasul — \texttt{GameClock.svelte}}
+
+Afișează cele două blocuri de timp (jucător și motor) formatate prin \texttt{formatTime()} din \texttt{timeFormat.ts}. Stilizarea activă sau inactivă a fiecărui bloc este controlată de \texttt{gameStore.isPlayerTurn}.
+
+\subsection{Jurnalul mutărilor — \texttt{MoveLog.svelte}}
+
+Iterează prin \texttt{gameStore.moveHistoryJSON} și redă fiecare mutare cu glifele de calitate, categoria colorată și evaluarea numerică. Butoanele de navigare apelează \texttt{gameStore.selectMove()}, care oprește sau repornește ceasul în funcție de starea curentă a jocului.
+
+\subsection{Panoul post-partidă — \texttt{PostGame.svelte}}
+
+Afișat după ce \texttt{currentPhase} trece în \texttt{TERMINATED}. Butonul \textit{Rematch} apelează \texttt{gameStore.executeRematch()}, care inversează culorile și repornește jocul cu aceleași setări. Butonul \textit{New game} apelează \texttt{gameStore.goToMenu()}, resetând complet starea și revenind la formularul de configurare.
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Motorul de șah}
+
+Dacă interfața acoperă experiența vizuală și fluxul utilizatorului, nucleul analitic al aplicației este reprezentat de integrarea motorului Stockfish și a bibliotecii de validare \texttt{chess.js}. Această separare se reflectă și în arhitectura codului: interfața comunică cu motorul printr-un set restrâns de metode publice, fără a depinde de detaliile implementării interne.
+
+\subsection{Web Worker dinamic — \texttt{engine.ts} și \texttt{engineInstance.ts}}
+
+\subsubsection{Inițializarea Web Worker-ului}
+
+Constructorul \texttt{ChessEngine} creează un Web Worker pornind de la scriptul Stockfish descărcat de pe CDN, folosind un \texttt{Blob URL} pentru a ocoli restricțiile CORS. Secvența de inițializare respectă protocolul UCI:
+
+\needspace{10\baselineskip}
+\nopagebreak
+\begin{lstlisting}[language=Java, caption={Inițializare Worker și handshake UCI}]
+private async initWorker() {
+  const response = await fetch(
+    'https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js'
+  );
+  const script = await response.text();
+  const blob   = new Blob([script], { type: 'application/javascript' });
+  this.worker  = new Worker(URL.createObjectURL(blob));
+  this.worker.onmessage = this.defaultMessageHandler.bind(this);
+  this.worker.postMessage('uci');
+}
+\end{lstlisting}
+\nopagebreak
+
+\subsubsection{Bufferul de comenzi}
+
+Deoarece workerul devine funcțional abia după primirea semnalului \texttt{readyok}, comenzile trimise înainte sunt stocate într-un buffer intern și redate imediat ce motorul confirmă disponibilitatea.
+
+\subsubsection{Evaluarea asincronă}
+
+Metoda \texttt{evaluatePositionAsync(fen, depth)} întoarce un \texttt{Promise<number>} cu scorul centipawn normalizat din perspectiva albului. Aceasta suprascrie temporar \texttt{onmessage}, parsează linii de tipul \texttt{score cp -15} și, la primirea mesajului \texttt{bestmove}, restabilește handler-ul original și rezolvă promisiunea.
+
+\subsubsection{Nivelul de abilitate}
+
+Conform protocolului UCI (Universal Chess Interface), motorul Stockfish poate primi comanda \texttt{setoption name Skill Level value X}, unde X este un număr între 0 și 20. Metoda \texttt{setSkillLevel()} trimite această comandă Web Worker-ului:
+
+\needspace{8\baselineskip}
+\nopagebreak
+\begin{lstlisting}[language=Java, caption={Setarea nivelului de abilitate conform UCI}]
+public setSkillLevel(level: number) {
+    const bounded = Math.max(0, Math.min(20, Math.floor(level)));
+    this.sendMessage(`setoption name Skill Level value ${bounded}`);
+}
+\end{lstlisting}
+\nopagebreak
+
+\subsubsection{Singleton}
+
+Fișierul \texttt{engineInstance.ts} exportă o singură instanță a clasei \texttt{ChessEngine}, garantând existența unui singur Web Worker pe toată durata de viață a aplicației.
+
+\subsection{Sistemul de validare a mutărilor — \texttt{chess.js}}
+
+\subsubsection{Integrarea prin NPM}
+
+Spre deosebire de biblioteca grafică, motorul de reguli \texttt{chess.js} este integrat direct în pachetul aplicației prin NPM, asigurând disponibilitatea offline și verificarea tipurilor la compilare.
+
+\begin{lstlisting}[caption={Declararea chess.js în package.json}]
+"dependencies": {
+  "chess.js": "^1.4.0"
+}
+\end{lstlisting}
+
+\subsubsection{Funcționalități cheie în \texttt{gameStore}}
+
+\texttt{GameStore} instanțiază logica și deleagă validarea mutărilor bibliotecii. Detectarea șahului mat ține cont de culoarea care a livrat mutarea finală, permițând afișarea corectă a rezultatului:
+
+\begin{lstlisting}[language=Java, caption={Detectarea șahului mat în gameStore.svelte.ts}]
+updateStatus() {
+  if (this.game.isGameOver()) {
+    if (this.game.isCheckmate()) {
+      // game.turn() este culoarea aflata in sah mat
+      const playerMated = this.game.turn() === this.playerColor;
+      this.handleTermination(
+        playerMated ? 'status_checkmate_ai' : 'status_checkmate_player'
+      );
+    } else if (this.game.isDraw()) {
+      this.handleTermination('status_draw');
+    }
+  }
+}
+\end{lstlisting}
+
+\subsection{Clasificarea mutărilor — \texttt{moveCategories.ts}}
+
+Funcția \texttt{categorizeMove()} calculează pierderea de centipawni în funcție de culoarea care a mutat și de pragurile definite:
+
+\begin{lstlisting}[language=Java]
+const loss = movedColor === 'w'
+    ? prevEval - currentEval
+    : currentEval - prevEval;
+
+if (loss > 300) return 'blunder';
+if (loss > 100) return 'mistake';
+if (loss > 50)  return 'inaccuracy';
+if (loss > 20)  return 'good';
+if (loss > 5)   return 'excellent';
+return 'best';
+\end{lstlisting}
+
+\paragraph{Interpretarea pragmatică a pierderii de centipawni.}
+Sistemul clasifică automat fiecare mutare a jucătorului într-una dintre cele șase categorii, pe baza pierderii de centipawni față de evaluarea poziției anterioare. Evaluarea inițială de referință \texttt{previousEval = 20cp} reflectă avantajul statistic al albului la începutul jocului, conform teoriei deschiderilor.
+\begin{itemize}
+  \item \textbf{Blunder} (CPL > 300) — greșeală gravă care schimbă radical soarta partidei.
+  \item \textbf{Mistake} (100 < CPL $\leq$ 300) — eroare semnificativă, dar nu decisivă.
+  \item \textbf{Inaccuracy} (50 < CPL $\leq$ 100) — inexactitate care pierde un avantaj minor.
+  \item \textbf{Good} (20 < CPL $\leq$ 50) — mutare bună, dar nu cea mai bună.
+  \item \textbf{Excellent} (5 < CPL $\leq$ 20) — mutare foarte bună, aproape de optim.
+  \item \textbf{Best} (CPL $\leq$ 5) — cea mai bună mutare sau una dintre cele mai bune.
+\end{itemize}
+
+\subsection{Reprezentarea stării jocului: notația FEN}
+
+Pentru comunicarea cu motorul Stockfish, sistemul utilizează notația FEN (Forsyth-Edwards Notation) ca format de schimb de date. FEN-ul este generat automat de \texttt{chess.js} și transmis motorului după fiecare mutare:
+
+\begin{lstlisting}[language=Java, caption={Generarea FEN în gameStore.svelte.ts}]
+recordPlayerMove(san: string, currentEvalWhite: number) {
+  this.moveHistoryJSON.push({
+    san,
+    fen: this.game.fen(),   // snapshot pozitie dupa mutare
+    evalCp: currentEvalWhite
+  });
+}
+\end{lstlisting}
+
+FEN-ul stocat cu fiecare mutare permite reconstituirea fidelă a oricărei poziții din cursul partidei, atât în replay-ul din pagina de joc, cât și în modul de review din istoricul partidelor.
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Integrarea cu backend-ul și baza de date}
+
+\subsection{Autentificarea și gestionarea sesiunilor}
+
+Autentificarea este implementată complet pe server, fără biblioteci externe. La fiecare request HTTP, hook-ul \texttt{hooks.server.ts} citește cookie-ul \texttt{session\_id}, validează sesiunea în baza de date și atașează datele utilizatorului la \texttt{event.locals}. Toate paginile protejate verifică \texttt{locals.user} în funcția \texttt{load()}, redirecționând spre \texttt{/auth/login} dacă sesiunea lipsește sau a expirat.
+
+Modulul \texttt{src/lib/server/auth.ts} expune patru funcții de bază:
+\begin{itemize}
+  \item \texttt{hashPassword()} — hashing bcryptjs cu cost 12;
+  \item \texttt{verifyPassword()} — comparare securizată bcryptjs;
+  \item \texttt{createSession()} — inserează o sesiune cu TTL de 30 de zile;
+  \item \texttt{deleteSession()} — șterge sesiunea la deconectare.
+\end{itemize}
+
+\subsection{Schema bazei de date — \texttt{schema.sql}}
+
+Baza de date PostgreSQL conține patru tabele principale:
+\begin{itemize}
+  \item \texttt{users} — \texttt{id} (UUID), \texttt{email}, \texttt{display\_name}, \texttt{password\_hash}, \texttt{created\_at}.
+  \item \texttt{sessions} — \texttt{id} (UUID), \texttt{user\_id} (FK), \texttt{expires\_at}, \texttt{created\_at}.
+  \item \texttt{games} — metadatele partidei: \texttt{session\_id} (PK), \texttt{user\_id} (FK), tip șah, control timp, nivel AI, număr mutări, motiv terminare, timestamp.
+  \item \texttt{moves} — fiecare mutare cu numărul de ordine, notația SAN, FEN-ul rezultat, categoria, valoarea numerică și evaluarea centipawn.
+\end{itemize}
+Indecșii definiți pe \texttt{sessions(user\_id, expires\_at)} și \texttt{games(user\_id, played\_at DESC)} asigură interogări eficiente pentru operațiunile frecvente.
+
+\subsection{API-ul de export — \texttt{/api/export}}
+
+\begin{itemize}
+  \item \textbf{POST} — inserează metadatele partidei și vectorul de mutări într-o singură tranzacție PostgreSQL. Autentificarea este verificată prin \texttt{locals.user} înainte de orice operație de scriere.
+  \item \textbf{GET} — returnează toate partidele utilizatorului curent împreună cu mutările aferente, ordonate descrescător după data jocului.
+\end{itemize}
+
+\subsection{API-ul de clasament — \texttt{/api/leaderboard}}
+
+Endpoint-ul GET agregă statistici per utilizator printr-o singură interogare SQL cu \texttt{JOIN} și \texttt{GROUP BY}:
+
+\begin{lstlisting}[language=SQL, caption={Interogarea clasamentului}]
+SELECT
+  u.display_name,
+  COUNT(*)                                              AS games_played,
+  ROUND(AVG(g.moves_count), 1)                          AS avg_moves,
+  SUM(CASE WHEN g.termination_reason ILIKE '%player%'
+       THEN 1 ELSE 0 END)                               AS wins,
+  ROUND(100.0 * SUM(CASE WHEN
+       g.termination_reason ILIKE '%player%'
+       THEN 1 ELSE 0 END) / COUNT(*), 1)                AS win_rate,
+  MIN(g.ai_skill_level)                                 AS min_skill,
+  MAX(g.ai_skill_level)                                 AS max_skill
+FROM games g
+JOIN users u ON u.id = g.user_id
+GROUP BY u.id, u.display_name
+ORDER BY win_rate DESC, games_played DESC
+\end{lstlisting}
+
+Victoriile sunt detectate prin prezența subșirului \texttt{'player'} în câmpul \texttt{termination\_reason}, acoperind atât \texttt{status\_timeout\_player} (victorie la timp), cât și \texttt{status\_checkmate\_player} (victorie prin șah mat).
+
+\subsection{Exportul automat}
+
+La terminarea jocului, \texttt{gameStore.triggerAutoExport()} trimite o cerere POST la \texttt{/api/export} cu toate datele partidei — metadate și istoricul complet al mutărilor. Dacă operația reușește, se incrementează \texttt{matchCounter} și se setează \texttt{hasExported = true} pentru a preveni exporturi duplicate. În caz de eșec, eroarea este înregistrată în consolă și exportul poate fi rethreshold la o terminare ulterioară.
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Fluxul complet al unei partide}
+
+\begin{enumerate}
+  \item \textbf{Configurare și inițializare.}
+  Utilizatorul completează formularul din \texttt{GameMenu}: nivel AI (0–20), culoarea pieselor și controlul de timp. La apăsarea butonului „Start game", \texttt{gameStore.startGame()} setează \texttt{playerColor} (aleatoriu dacă opțiunea este \texttt{'random'}), inițializează timpii cu valoarea de bază, trece faza în \texttt{PLAYING} și resetează evaluarea anterioară la 20cp. Dacă jucătorul alege negru, o comandă \texttt{evaluatePosition(fen, 300)} este trimisă imediat motorului pentru prima mutare a AI-ului.
+
+  \item \textbf{Mutarea jucătorului.}
+  \texttt{GameBoard} validează mutarea prin \texttt{gameStore.game.move()}, pornește ceasul la prima mutare, adaugă incrementul Fischer la timpul jucătorului, comută tura și apelează \texttt{engine.evaluatePositionAsync(fen, 8)} pentru evaluarea asincronă a poziției rezultate. La rezolvarea promisiunii, \texttt{gameStore.recordPlayerMove()} calculează CPL, stochează mutarea și actualizează \texttt{previousEval}. Dacă jocul continuă, se trimite \texttt{engine.evaluatePosition(fen, 300)} pentru răspunsul AI-ului.
+
+  \item \textbf{Mutarea AI-ului.}
+  Când Stockfish finalizează căutarea, callback-ul \texttt{handleEngineMove()} extrage mutarea din mesajul \texttt{bestmove}, o aplică pe tablă, adaugă incrementul Fischer pentru AI și comută tura înapoi la jucător.
+
+  \item \textbf{Gestionarea timpului și terminarea jocului.}
+  Ceasul rulează printr-un \texttt{setInterval} de 1 secundă. Dacă timpul unuia dintre jucători ajunge la zero, \texttt{handleTermination()} este apelat cu cheia de stare corespunzătoare. După fiecare mutare, \texttt{updateStatus()} verifică finalul de joc — prin șah mat, remiză sau timeout — și oprește ceasul.
+
+  \item \textbf{Exportul automat și opțiunile post-partidă.}
+  \texttt{triggerAutoExport()} salvează partida în baza de date. Badge-ul \textit{Saved} din bara de stare confirmă vizual operația. Utilizatorul poate naviga prin mutările jocului încheiat, iniția o revanșă cu culorile inversate sau reveni la meniu.
+\end{enumerate}
+
+\newpage
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Direcții de viitor}
+
+Arhitectura actuală oferă o bază solidă extensibilă în mai multe direcții.
+
+\subsection{Integrarea modelelor de limbaj pentru analiza narativă}
+Un modul de analiză textuală bazat pe modele de limbaj de mari dimensiuni (LLM) ar putea genera explicații în limbaj natural pentru mutările clasificate ca greșeli sau gafe, transformând aplicația într-un antrenor interactiv de șah.
+
+\subsection{Exportul în formate standard de șah}
+Integrarea exportului în format PGN (Portable Game Notation) ar permite utilizatorilor să importe partidele în platforme externe (Lichess, Chess.com, ChessBase) pentru analize mai detaliate.
+
+\subsection{Modul de joc multiplayer (PvP online)}
+Adăugarea posibilității de a juca împotriva altor utilizatori în timp real ar extinde semnificativ audiența platformei. Prin implementarea unui canal WebSocket, starea jocului poate fi sincronizată instantaneu între clienți. Arhitectura reactivă bazată pe store-ul global oferă o fundație solidă pentru această extindere.
+
+\subsection{Vizualizarea progresului și analiza longitudinală}
+Pe baza istoricului de partide, un panou de statistici personale ar putea afișa evoluția CPL mediu în timp, distribuția categoriilor de mutări per sesiune și rata de victorii în funcție de controlul de timp sau nivelul AI.
+
+\subsection{Suport pentru motoare multiple}
+Abstractizarea clasei \texttt{ChessEngine} permite înlocuirea sau paralelizarea motoarelor de analiză. O versiune viitoare ar putea oferi selecția între Stockfish NNUE, Maia (model antrenat pe partide umane) sau motoare specializate pe anumite niveluri de abilitate.
+
+\newpage
+\addcontentsline{toc}{section}{Bibliografie}
+\begin{thebibliography}{99}
+
+\bibitem{alphazero}
+Silver, D., Hubert, T., Schrittwieser, J., et al. (2017).
+\textit{Mastering Chess and Shogi by Self-Play with a General Reinforcement Learning Algorithm}.
+arXiv:1712.01815 [cs.AI].
+\url{https://arxiv.org/abs/1712.01815}
+
+\bibitem{maia}
+McIlroy-Young, R., Sen, S., Kleinberg, J., Anderson, A. (2020).
+\textit{Aligning Superhuman AI with Human Behavior: Chess as a Model System}.
+arXiv:2006.01855 [cs.HC].
+\url{https://arxiv.org/abs/2006.01855}
+
+\bibitem{gpt_chess}
+Noever, D., Ciolino, M. (2020).
+\textit{The Chess Transformer: Mastering Play using Generative Language Models}.
+arXiv:2008.04057 [cs.CL].
+\url{https://arxiv.org/abs/2008.04057}
+
+\bibitem{individual_behavior}
+McIlroy-Young, R., Wang, R., Sen, S., Kleinberg, J., Anderson, A. (2020).
+\textit{Learning Models of Individual Behavior in Chess}.
+arXiv:2008.10086 [cs.LG].
+\url{https://arxiv.org/abs/2008.10086}
+
+\bibitem{move_prediction}
+Toshniwal, S., Wiseman, S., Rush, A. M., Gimpel, K. (2021).
+\textit{Chess as a Testbed for Language Model State Tracking}.
+arXiv:2102.13249 [cs.CL].
+\url{https://arxiv.org/abs/2102.13249}
+
+\bibitem{rl_games}
+Schrittwieser, J., Antonoglou, I., Hubert, T., et al. (2019).
+\textit{Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model}.
+arXiv:1911.08265 [cs.LG].
+\url{https://arxiv.org/abs/1911.08265}
+
+\bibitem{eval_functions}
+Lai, M. (2015).
+\textit{Giraffe: Using Deep Reinforcement Learning to Play Chess}.
+arXiv:1509.01549 [cs.NE].
+\url{https://arxiv.org/abs/1509.01549}
+
+\bibitem{wasm_performance}
+Jangda, A., Powers, B., Berger, E. D., Guha, A. (2019).
+\textit{Not So Fast: Analyzing the Performance of WebAssembly vs. Native Code}.
+arXiv:1901.09056 [cs.PL].
+\url{https://arxiv.org/abs/1901.09056}
+
+\bibitem{engine_openings}
+Levene, M., Bar-Ilan, J. (2006).
+\textit{Comparing Typical Opening Move Choices Made by Humans and Chess Engines}.
+arXiv:cs/0610060 [cs.AI].
+\url{https://arxiv.org/abs/cs/0610060}
+
+\bibitem{stockfish_engine}
+\textit{Stockfish: A Strong Open Source Chess Engine}.
+[Software]. Available at: \url{https://stockfishchess.org/}
+
+\bibitem{nodejs_official}
+\textit{Node.js: JavaScript runtime built on Chrome's V8 JavaScript engine}.
+[Online]. Available at: \url{https://nodejs.org/}
+
+\bibitem{svelte_official}
+\textit{Svelte: Cybernetically Enhanced Web Apps}.
+[Software]. Available at: \url{https://svelte.dev/}
+
+\end{thebibliography}
+
+\end{document}
