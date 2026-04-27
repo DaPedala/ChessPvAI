@@ -1,4 +1,4 @@
-# ChessPvAI
+# ChessPvAI - English
 
 Play chess against the Stockfish engine with real-time move analysis, a full game history, and a global leaderboard. Built with SvelteKit and PostgreSQL, with Stockfish running entirely in the browser via Web Worker — no server-side computation required for gameplay.
 
@@ -26,7 +26,6 @@ cd ChessPvAI
 
 ```bash
 npm install
-npm install bcryptjs
 ```
 
 ---
@@ -141,7 +140,6 @@ cd ChessPvAI
 
 ```bash
 npm install
-npm install bcryptjs
 ```
 
 ---
