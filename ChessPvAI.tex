@@ -12,6 +12,15 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{needspace}
+\usepackage{newunicodechar}
+\usepackage{amssymb}
+
+\newunicodechar{→}{\ensuremath{\rightarrow}}
+\newunicodechar{←}{\ensuremath{\leftarrow}}
+\newunicodechar{↩}{\ensuremath{\hookleftarrow}}
+\newunicodechar{‹}{\guilsinglleft}
+\newunicodechar{›}{\guilsinglright}
+\newunicodechar{─}{\textemdash}
 
 \geometry{margin=2.5cm}
 
@@ -140,7 +149,7 @@ Aplicația ChessPvAI este structurată în șase zone vizuale distincte, accesib
 
 Toate paginile aplicației partajează un layout comun definit în \texttt{+layout.svelte}. Bara de navigare fixă ocupă permanent partea superioară a ecranului și conține mai multe elemente:
 \begin{itemize}
-  \item \textbf{Logo-ul aplicației} (\texttt{♔ CHESSPvAI}), care funcționează și ca link spre pagina principală.
+  \item \textbf{Logo-ul aplicației} (\texttt{CHESSPvAI}), care funcționează și ca link spre pagina principală.
   \item \textbf{Linkuri de navigare} spre secțiunile paginii principale (Features, How it works, About), spre istoricul partidelor și spre clasament. Acestea sunt ascunse în paginile de joc și autentificare pentru a nu distrage atenția utilizatorului.
   \item \textbf{Selectorul de limbă} — un dropdown compact pentru comutarea între engleză și română, persistent pe toată durata sesiunii prin \texttt{localStorage}.
   \item \textbf{Zona de autentificare} — afișează butoanele \textit{Log in} și \textit{Sign up} pentru vizitatorii neautentificați sau, pentru utilizatorii autentificați, numele de afișat (cu link spre setările contului), butonul \textit{Log out} și butonul de acces rapid la pagina de joc.

@@ -5,6 +5,11 @@ build/
 dist/
 .env
 .env.*
+ChessPvAI.aux
+ChessPvAI.log
+ChessPvAI.out
+ChessPvAI.pdf
+ChessPvAI.toc
 !.env.example
 data/
 *.local
